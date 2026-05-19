@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AtlasRoot v4.0</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- ═══ DESKTOP ONLY OVERLAY ═══ -->
+  <div id="desktop-block" class="desktop-block">
+    <div class="desktop-block-box">
+      <div class="desktop-block-icon">🖥️</div>
+      <div class="desktop-block-title">AtlasRoot</div>
+      <div class="desktop-block-sub">DESKTOP ONLY</div>
+      <div class="desktop-block-msg">This platform is optimized for desktop computers.<br>Please access from a laptop or desktop device.</div>
+      <div class="desktop-block-hint">Minimum width: 768px</div>
+    </div>
+  </div>
+  <canvas id="matrix"></canvas>
+  <div id="glitch-layer"></div>
+  <div class="crt-overlay"></div>
+
+  <!-- ═══ BOOT SCREEN ═══ -->
+  <div class="boot-flash"></div>
+  <div id="boot-screen" class="boot-screen">
+    <div class="boot-box">
+      <div class="boot-logo">
+ ██╗  ██╗ █████╗  ██████╗██╗  ██╗███████╗██████╗     ██████╗██╗  ██╗ █████╗ ████████╗
+ ██║  ██║██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗   ██╔════╝██║  ██║██╔══██╗╚══██╔══╝
+ ███████║███████║██║     █████╔╝ █████╗  ██████╔╝   ██║     ███████║███████║   ██║
+ ██╔══██║██╔══██║██║     ██╔═██╗ ██╔══╝  ██╔══██╗   ██║     ██╔══██║██╔══██║   ██║
+ ██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██║  ██║   ╚██████╗██║  ██║██║  ██║   ██║
+ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
+      </div>
+      <div class="boot-subtitle">SECURE COMMUNICATION SYSTEM v4.0</div>
+      <div class="boot-output-wrap">
+        <div class="boot-output" id="boot-output"></div>
+      </div>
+      <div class="boot-bar-track">
+        <div class="boot-bar-fill" id="boot-bar-fill"></div>
+      </div>
+      <div class="boot-status" id="boot-status">INITIALIZING SYSTEM...</div>
+      <div class="boot-footer"><span class="boot-fw">FIREWALL: ACTIVE</span><span class="boot-enc">AES-256</span><span class="boot-ver">v4.0.1</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ EMERGENCY OVERLAY ═══ -->
+  <div id="emergency-overlay" class="emergency-overlay">
+    <div class="emergency-box">
+      <div class="emergency-icon">⚠</div>
+      <div class="emergency-title">EMERGENCY PROTOCOL ACTIVE</div>
+      <div class="emergency-sub">LOCKDOWN MODE ENGAGED</div>
+      <div class="emergency-output" id="emergency-output"></div>
+      <button id="emergency-disable" class="emergency-btn">> DISENGAGE</button>
+    </div>
+  </div>
+
+  <!-- ═══ MAINTENANCE OVERLAY ═══ -->
+  <div id="maintenance-overlay" class="emergency-overlay" style="display:none">
+    <div class="emergency-box">
+      <div class="emergency-icon">🔧</div>
+      <div class="emergency-title">MAINTENANCE MODE</div>
+      <div class="emergency-sub" id="maintenance-msg">Server is under maintenance. Please try again later.</div>
+      <div class="emergency-output" id="maintenance-output">
+        <div class="line">> System maintenance in progress...</div>
+        <div class="line">> Please wait while we upgrade our systems.</div>
+      </div>
+      <button id="maintenance-refresh" class="emergency-btn">> RETRY CONNECTION</button>
+    </div>
+  </div>
+
+  <!-- ═══ LOGIN/REGISTER (Two-Step Auth) ═══ -->
+  <div id="auth-screen" class="screen">
+    <div class="auth-box">
+      <div class="auth-ascii">
+╔═══════════════════════════════════════╗
+║  ██╗  ██╗ █████╗  ██████╗██╗  ██╗   ║
+║  ██║  ██║██╔══██╗██╔════╝██║ ██╔╝   ║
+║  ███████║███████║██║     █████╔╝    ║
+║  ██╔══██║██╔══██║██║     ██╔═██╗    ║
+║  ██║  ██║██║  ██║╚██████╗██║  ██╗   ║
+║  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝   ║
+║       TWO-STEP AUTH v4.0            ║
+╚═══════════════════════════════════════╝
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">[ LOGIN ]</button>
+        <button class="auth-tab" data-tab="register">[ REGISTER ]</button>
+      </div>
+      <div class="auth-terminal" id="auth-terminal">
+        <div class="term-line system">> AUTHENTICATION REQUIRED</div>
+        <div class="term-line system">> STEP 1: ENTER USER ID</div>
+      </div>
+      <div id="auth-error" class="auth-error"></div>
+
+      <!-- LOGIN: Step 1 - USER ID -->
+      <div id="login-step1" class="auth-form active">
+        <div class="auth-field">
+          <span class="auth-label">STEP 1: USER ID</span>
+          <input type="text" id="login-user" placeholder="Enter username..." maxlength="20" autofocus>
+        </div>
+        <button type="button" id="login-step1-btn" class="auth-submit">>> VERIFY USER ID</button>
+      </div>
+
+      <!-- LOGIN: Step 2 - MASTER KEY -->
+      <div id="login-step2" class="auth-form">
+        <div class="auth-field">
+          <span class="auth-label">STEP 2: MASTER KEY</span>
+          <input type="password" id="login-pass" placeholder="Enter master key..." autocomplete="off">
+        </div>
+        <button type="submit" id="login-form" class="auth-submit">>> DECRYPT &amp; AUTHENTICATE</button>
+        <button type="button" id="login-back-btn" class="auth-action-btn" style="margin-top:2px">< BACK TO USER ID</button>
+      </div>
+
+      <!-- REGISTER -->
+      <form id="register-form" class="auth-form" autocomplete="off">
+        <div class="auth-field">
+          <span class="auth-label">CHOOSE USERNAME</span>
+          <input type="text" id="reg-user" placeholder="3-20 characters..." maxlength="20">
+        </div>
+        <div class="auth-field">
+          <span class="auth-label">CHOOSE MASTER KEY</span>
+          <input type="password" id="reg-pass" placeholder="4+ characters...">
+        </div>
+        <div class="auth-field" style="display:none" id="sec-q-field">
+          <span class="auth-label">SECURITY ANSWER (for account recovery)</span>
+          <input type="text" id="reg-sec-answer" placeholder="e.g. Your favorite algorithm..." maxlength="100">
+        </div>
+        <button type="submit" class="auth-submit">>> REGISTER</button>
+      </form>
+      <div class="auth-actions">
+        <button id="guest-btn" class="auth-action-btn">> ENTER AS GUEST</button>
+        <button id="forgot-btn" class="auth-action-btn">> FORGET ALGORITHM</button>
+      </div>
+      <div id="forgot-form" class="auth-forgot" style="display:none">
+        <div class="auth-field" style="max-width:280px;margin:0 auto">
+          <span class="auth-label">🔐 FORGET ALGORITHM - ACCOUNT RECOVERY</span>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+            <input type="text" id="forgot-user" placeholder="ENTER USERNAME" maxlength="20" style="background:rgba(0,8,0,0.6);border:1px solid var(--border-subtle);color:var(--fg);font-family:inherit;font-size:11px;padding:6px 8px;outline:none">
+            <input type="text" id="forgot-answer" placeholder="YOUR SECURITY ANSWER" maxlength="100" style="background:rgba(0,8,0,0.6);border:1px solid var(--border-subtle);color:var(--fg);font-family:inherit;font-size:11px;padding:6px 8px;outline:none">
+            <button id="forgot-lookup-btn" class="auth-submit" style="padding:6px;font-size:9px">> RECOVER ACCOUNT</button>
+          </div>
+        </div>
+        <div id="forgot-result" class="auth-forgot-result"></div>
+      </div>
+      <div class="auth-footer">
+        <span class="auth-cursor blink">█</span> <span class="auth-footer-text">AWAITING AUTHENTICATION...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ROOM BROWSER ═══ -->
+  <div id="rooms-screen" class="screen">
+    <div class="rooms-container">
+      <div class="rooms-header">
+        <div class="rooms-title"><span class="rooms-icon">🌐</span><span>[</span>ROOM BROWSER<span>]</span></div>
+        <div class="rooms-user">connected as: <span id="rooms-username"></span></div>
+      </div>
+      <div class="rooms-body">
+        <div class="rooms-filter">
+          <input type="text" id="rooms-search" placeholder="🔍 FILTER ROOMS..." maxlength="30">
+        </div>
+        <div class="rooms-list" id="rooms-list"></div>
+        <div class="rooms-create">
+          <input type="text" id="new-room-name" placeholder="ROOM NAME" maxlength="30">
+          <input type="text" id="new-room-topic" placeholder="TOPIC (optional)" maxlength="100">
+          <button id="create-room-btn">> CREATE ROOM</button>
+        </div>
+      </div>
+      <div class="rooms-footer">
+        <button id="logout-btn">> DISCONNECT</button>
+        <span id="rooms-count"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CHAT ═══ -->
+  <div id="chat-screen" class="screen">
+    <div class="chat-container">
+      <!-- Header -->
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <button id="back-btn" class="hdr-btn" title="Back to rooms">◀</button>
+          <div class="hdr-divider"></div>
+          <span class="chat-header-room" id="current-room">LOBBY</span>
+          <span class="chat-header-topic" id="current-topic"></span>
+          <span class="focus-indicator" id="focus-indicator">[FOCUS]</span>
+          <div class="hdr-divider"></div>
+          <span class="chat-header-status"><span class="dot pulse"></span><span id="conn-status">CONNECTED</span></span>
+          <span class="user-count-badge">👥 <span id="user-count">0</span></span>
+        </div>
+        <div class="chat-header-right">
+          <div class="hdr-btn-group">
+            <button id="anon-btn" class="hdr-btn" title="Anonymous mode">👤</button>
+            <button id="users-toggle-btn" class="hdr-btn" title="Toggle users">👥</button>
+            <button id="notif-btn" class="hdr-btn" title="Notifications">🔔<span id="notif-badge" class="notif-badge-hdr">0</span></button>
+            <button id="pc-btn" class="hdr-btn" title="Private Chat">🔒</button>
+            <button id="sound-toggle" class="hdr-btn" title="Toggle sound">♪</button>
+          </div>
+          <div class="hdr-divider"></div>
+          <div class="theme-switcher">
+            <button class="theme-btn active" data-theme="green">G</button>
+            <button class="theme-btn" data-theme="amber">A</button>
+            <button class="theme-btn" data-theme="blue">B</button>
+            <button class="theme-btn" data-theme="red">R</button>
+            <button class="theme-btn" data-theme="pink">P</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-body">
+        <!-- Messages -->
+        <div class="chat-messages" id="chat-messages">
+          <div class="welcome-msg">
+            <pre>
+  ╔══════════════════════════════════╗
+  ║  ██╗  ██╗ █████╗  ██████╗██╗  ██╗
+  ║  ██║  ██║██╔══██╗██╔════╝██║ ██╔╝
+  ║  ███████║███████║██║     █████╔╝
+  ║  ██╔══██║██╔══██║██║     ██╔═██╗
+  ║  ██║  ██║██║  ██║╚██████╗██║  ██╗
+  ║  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+  ║                                      ║
+  ║  Type /help for commands           ║
+  ║  Click username to profile        ║
+  ║  Click time to reply              ║
+  ╚══════════════════════════════════════╝
+            </pre>
+          </div>
+        </div>
+        <button id="scroll-bottom-btn" class="scroll-bottom-btn" title="Scroll to bottom">↓</button>
+
+        <!-- User panel -->
+        <div class="chat-users" id="chat-users-panel">
+          <div class="chat-users-header"><span>&gt; ONLINE</span><span id="user-count-panel" class="u-count"></span></div>
+          <div class="chat-users-search"><input type="text" id="user-search" placeholder="🔍 filter users..." maxlength="20"></div>
+          <div class="chat-users-list" id="user-list"></div>
+          <div class="chat-users-footer">
+            <span id="my-role"></span>
+            <div class="status-dropdown" id="status-dropdown">
+              <button class="status-dropdown-btn" id="status-btn">🟢 ONLINE</button>
+              <div class="status-dropdown-menu" id="status-menu">
+                <div class="status-dropdown-item active" data-status="online">🟢 Online</div>
+                <div class="status-dropdown-item" data-status="away">🟡 Away</div>
+                <div class="status-dropdown-item" data-status="busy">🔴 Busy</div>
+                <div class="status-dropdown-item" data-status="invisible">⚫ Invisible</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="chat-input-area">
+        <div id="reply-indicator" class="reply-indicator" style="display:none"></div>
+        <div id="typing-indicator" class="typing-indicator"></div>
+        <div class="emoji-strip" id="emoji-strip">
+          <button class="emoji-strip-btn" data-emoji="👍">👍</button>
+          <button class="emoji-strip-btn" data-emoji="❤️">❤️</button>
+          <button class="emoji-strip-btn" data-emoji="😂">😂</button>
+          <button class="emoji-strip-btn" data-emoji="😎">😎</button>
+          <button class="emoji-strip-btn" data-emoji="🔥">🔥</button>
+          <button class="emoji-strip-btn" data-emoji="💀">💀</button>
+          <button class="emoji-strip-btn" data-emoji="👾">👾</button>
+          <button class="emoji-strip-btn" data-emoji="🗿">🗿</button>
+          <button class="emoji-strip-btn" data-emoji="✅">✅</button>
+          <button class="emoji-strip-btn" data-emoji="❌">❌</button>
+        </div>
+        <div class="chat-input-row">
+          <span class="input-prompt">></span>
+          <div class="status-dropdown" id="input-status-dropdown">
+            <button class="status-dropdown-btn" id="input-status-btn" title="Change status">🟢</button>
+            <div class="status-dropdown-menu" id="input-status-menu">
+              <div class="status-dropdown-item active" data-status="online">🟢 Online</div>
+              <div class="status-dropdown-item" data-status="away">🟡 Away</div>
+              <div class="status-dropdown-item" data-status="busy">🔴 Busy</div>
+              <div class="status-dropdown-item" data-status="invisible">⚫ Invisible</div>
+            </div>
+          </div>
+          <input type="text" id="message-input" placeholder="type command or message..." autofocus>
+          <button id="file-btn" class="input-btn" title="Upload file">📎</button>
+          <button id="send-btn" class="input-btn exec-btn">EXECUTE</button>
+          <input type="file" id="file-input" style="display:none">
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="chat-footer">
+        <div class="footer-left">
+          <span class="footer-badge">AES-256</span>
+          <span class="footer-divider"></span>
+          <span class="footer-stat" id="cpu-meter"><span class="stat-label">CPU</span><span class="stat-bar"><span class="stat-fill" id="cpu-fill"></span></span><span class="stat-val" id="cpu-val">0%</span></span>
+          <span class="footer-divider"></span>
+          <span class="footer-stat" id="ram-meter"><span class="stat-label">RAM</span><span class="stat-bar"><span class="stat-fill" id="ram-fill"></span></span><span class="stat-val" id="ram-val">0MB</span></span>
+          <span class="footer-divider"></span>
+          <div class="xp-bar-wrap" id="xp-bar-wrap" style="display:none">
+            <span class="xp-bar-label" id="xp-bar-label">LVL 1</span>
+            <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar-fill"></div></div>
+            <span class="xp-bar-text" id="xp-bar-text">0/100</span>
+          </div>
+        </div>
+        <div class="footer-right">
+          <div class="clock-box" id="clock-box">
+            <span class="clock-time" id="clock-time">00:00:00</span>
+            <span class="clock-date" id="clock-date">---</span>
+          </div>
+          <button id="emergency-btn" class="emergency-trigger">⚠ LOCKDOWN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PRIVATE CHAT PANEL ═══ -->
+  <div id="private-chat" class="private-chat-overlay" style="display:none">
+    <div class="private-chat-container">
+      <div class="private-chat-sidebar">
+        <div class="private-chat-sidebar-header">
+          <span>💬 PRIVATE CHATS</span>
+          <button id="private-chat-close" class="modal-close">×</button>
+        </div>
+        <div class="private-chat-conversations" id="private-conversations"></div>
+      </div>
+      <div class="private-chat-main">
+        <div class="private-chat-main-header" id="private-chat-header">
+          <button id="private-chat-back" class="private-chat-back-btn">◀</button>
+          <span id="private-chat-partner">Select a conversation</span>
+          <span id="private-chat-typing" class="private-chat-typing">typing...</span>
+        </div>
+        <div class="private-chat-messages" id="private-chat-messages">
+          <div class="private-chat-empty">👤 Select a user to start chatting</div>
+        </div>
+        <div class="private-chat-input-area" id="private-chat-input-area" style="display:none">
+          <input type="text" id="private-chat-input" placeholder="Type a message..." autocomplete="off">
+          <button id="private-chat-send" class="input-btn exec-btn">SEND</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div id="sidebar" class="sidebar">
+    <div class="sidebar-header">☰ MENU</div>
+    <div class="sidebar-body">
+      <button class="sidebar-btn" data-view="profile" title="Profile">👤 PROFILE</button>
+      <button class="sidebar-btn active" data-view="chat" title="Chat">💬 CHAT</button>
+      <button class="sidebar-btn" data-view="private" title="Private Chat" id="sidebar-pc-btn">🔒 PRIVATE</button>
+      <button class="sidebar-btn" data-view="settings" title="Settings">⚙️ SETTINGS</button>
+      <button class="sidebar-btn" id="sidebar-exit" title="Exit">🚪 EXIT</button>
+    </div>
+    <div class="sidebar-footer">AtlasRoot v4.0</div>
+  </div>
+  <button id="sidebar-toggle" class="sidebar-toggle">☰</button>
+
+  <!-- ═══ CONTEXT MENU ═══ -->
+  <div id="context-menu" class="context-menu">
+    <div class="context-menu-item" data-action="copy">📋 Copy</div>
+    <div class="context-menu-item" data-action="reply">↩️ Reply</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" data-action="report">🚩 Report</div>
+    <div class="context-menu-item danger" data-action="delete" id="ctx-delete">🗑️ Delete</div>
+  </div>
+
+  <!-- Notification Center -->
+  <div id="notif-panel" class="notif-panel">
+    <div class="notif-panel-header">NOTIFICATIONS <span id="notif-panel-count">0</span></div>
+    <div class="notif-panel-body" id="notif-panel-body">
+      <div class="notif-empty">No notifications</div>
+    </div>
+  </div>
+
+  <!-- Server Status Panel -->
+  <div id="server-panel" class="modal-overlay">
+    <div class="modal-box server-box">
+      <div class="modal-header">SERVER STATUS <button id="server-panel-close" class="modal-close">×</button></div>
+      <div class="modal-body" id="server-panel-body">
+        <div class="modal-row"><span class="modal-label">UPTIME</span><span id="sv-uptime">--</span></div>
+        <div class="modal-row"><span class="modal-label">ONLINE</span><span id="sv-online">--</span></div>
+        <div class="modal-row"><span class="modal-label">TOTAL USERS</span><span id="sv-total-users">--</span></div>
+        <div class="modal-row"><span class="modal-label">MESSAGES</span><span id="sv-msgs">--</span></div>
+        <div class="modal-row"><span class="modal-label">ROOMS</span><span id="sv-rooms">--</span></div>
+        <div class="modal-row"><span class="modal-label">MEMORY</span><span id="sv-mem">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profile-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header"><span id="modal-username"></span><button id="modal-close" class="modal-close">×</button></div>
+      <div class="modal-body">
+        <div class="modal-row"><span class="modal-label">ROLE</span><span id="modal-role"></span></div>
+        <div class="modal-row"><span class="modal-label">STATUS</span><span id="modal-status"></span></div>
+        <div class="modal-row"><span class="modal-label">IP</span><span id="modal-ip"></span></div>
+        <div class="modal-row"><span class="modal-label">TOKEN</span><span id="modal-token"></span></div>
+        <div class="modal-row"><span class="modal-label">COLOR</span><span id="modal-color"></span></div>
+        <div class="modal-row"><span class="modal-label">XP</span><span id="modal-xp"></span></div>
+        <div class="modal-row"><span class="modal-label">REPUTATION</span><span id="modal-rep"></span></div>
+        <div class="modal-row"><span class="modal-label">LAST LOGIN</span><span id="modal-lastlogin"></span></div>
+        <div class="modal-row"><span class="modal-label">FAV CMDS</span><span id="modal-favcmds"></span></div>
+      </div>
+      <div class="modal-footer"><button id="modal-whisper" class="modal-action">> WHISPER</button></div>
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS MODAL ═══ -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-box settings-box">
+      <div class="modal-header">⚙️ SETTINGS <button id="settings-modal-close" class="modal-close">×</button></div>
+      <div class="modal-body">
+        <div class="modal-row"><span class="modal-label">🔊 SOUND</span><button id="settings-sound-toggle" class="modal-action" style="min-width:50px">♪</button></div>
+        <div class="modal-row"><span class="modal-label">🎨 THEME</span></div>
+        <div class="theme-selector">
+          <button class="theme-btn" data-theme="default">🔵 DEFAULT</button>
+          <button class="theme-btn" data-theme="amber">🟠 AMBER</button>
+          <button class="theme-btn" data-theme="green">🟢 GREEN</button>
+          <button class="theme-btn" data-theme="red">🔴 RED</button>
+        </div>
+        <div class="modal-row"><span class="modal-label">🔑 SESSION</span><button id="settings-logout-btn" class="modal-action">LOG OUT</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ADMIN PANEL ═══ -->
+  <div id="admin-panel" class="modal-overlay">
+    <div class="modal-box admin-box">
+      <div class="modal-header">ADMIN PANEL <span id="admin-panel-title" style="font-size:9px;color:var(--fg-dark)">CONTROL CENTER</span><button id="admin-panel-close" class="modal-close">×</button></div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-atab="users">USERS</button>
+        <button class="admin-tab" data-atab="rooms">ROOMS</button>
+        <button class="admin-tab" data-atab="messages">MESSAGES</button>
+        <button class="admin-tab" data-atab="firewall">FIREWALL</button>
+      </div>
+      <div class="admin-body" id="admin-body">
+        <!-- Users tab -->
+        <div class="admin-tab-content active" id="admin-users">
+          <div class="admin-search-row">
+            <input type="text" id="admin-user-search" placeholder="Filter users..." class="admin-search-input">
+            <span class="admin-count" id="admin-user-count">0</span>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="admin-users-table">
+              <thead><tr><th>ID</th><th>USERNAME</th><th>ROLE</th><th>STATUS</th><th>BANNED</th><th>ACTIONS</th></tr></thead>
+              <tbody id="admin-users-body"></tbody>
+            </table>
+          </div>
+          <div class="admin-refresh-row">
+            <button id="admin-users-refresh" class="admin-btn-small">⟳ REFRESH</button>
+          </div>
+        </div>
+        <!-- Rooms tab -->
+        <div class="admin-tab-content" id="admin-rooms">
+          <div class="admin-search-row">
+            <span class="admin-count" id="admin-room-count">0</span>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="admin-rooms-table">
+              <thead><tr><th>NAME</th><th>TOPIC</th><th>OWNER</th><th>MESSAGES</th><th>ACTIONS</th></tr></thead>
+              <tbody id="admin-rooms-body"></tbody>
+            </table>
+          </div>
+          <div class="admin-refresh-row">
+            <button id="admin-rooms-refresh" class="admin-btn-small">⟳ REFRESH</button>
+          </div>
+        </div>
+        <!-- Messages tab -->
+        <div class="admin-tab-content" id="admin-messages">
+          <div class="admin-search-row">
+            <input type="text" id="admin-msg-search" placeholder="Search messages..." class="admin-search-input">
+            <button id="admin-msg-search-btn" class="admin-btn-small">SEARCH</button>
+          </div>
+          <div class="admin-export-row">
+            <input type="text" id="admin-export-room" placeholder="Room name (default: current)" class="admin-search-input" style="flex:1">
+            <button id="admin-export-btn" class="admin-btn-small">EXPORT JSON</button>
+          </div>
+          <div class="admin-table-wrap" style="max-height:200px">
+            <div id="admin-msg-results"></div>
+          </div>
+        </div>
+        <!-- Firewall tab -->
+        <div class="admin-tab-content" id="admin-firewall">
+          <div class="admin-search-row">
+            <input type="text" id="admin-block-ip" placeholder="IP address to block..." class="admin-search-input">
+            <button id="admin-block-ip-btn" class="admin-btn-small">BLOCK</button>
+          </div>
+          <div class="admin-search-row">
+            <input type="text" id="admin-unblock-ip" placeholder="IP address to unblock..." class="admin-search-input">
+            <button id="admin-unblock-ip-btn" class="admin-btn-small">UNBLOCK</button>
+          </div>
+          <div class="admin-section-title">BLOCKED IPS</div>
+          <div class="admin-table-wrap" style="max-height:120px">
+            <div id="admin-blocked-ips"></div>
+          </div>
+          <div class="admin-section-title">BROADCAST</div>
+          <div class="admin-search-row">
+            <input type="text" id="admin-broadcast-msg" placeholder="Message to all rooms..." class="admin-search-input">
+            <button id="admin-broadcast-btn" class="admin-btn-small">SEND</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button id="admin-lockdown-btn" class="admin-btn-small" style="border-color:#f00;color:#f00">⚠ LOCKDOWN</button>
+            <button id="admin-sys-btn" class="admin-btn-small" onclick="var m=prompt('SYSTEM MESSAGE:');if(m)App.socket.emit('admin:broadcast',{text:m})">SYS MSG</button>
+          </div>
+        </div>
+      </div>
+      <div class="admin-footer" id="admin-footer">
+        <span id="admin-status" style="color:var(--fg-dark);font-size:8px">Admin console ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SEARCH MODAL ═══ -->
+  <div id="search-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-header">🔍 SEARCH MESSAGES <button id="search-modal-close" class="modal-close">×</button></div>
+      <div class="modal-body">
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <input type="text" id="search-input" placeholder="Search messages..." style="flex:1;background:var(--input-bg);border:1px solid var(--border-subtle);color:var(--fg);font-family:inherit;font-size:11px;padding:6px 8px;outline:none">
+          <button id="search-btn" class="modal-action" style="padding:6px 12px;font-size:9px">SEARCH</button>
+        </div>
+        <div id="search-results" style="max-height:250px;overflow-y:auto;font-size:9px;color:var(--fg-dim)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TOAST NOTIFICATIONS ═══ -->
+  <div id="toast-container"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
