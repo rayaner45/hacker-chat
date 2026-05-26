@@ -233,13 +233,9 @@ function createRoom(name, topic, ownerId, password) {
   getDB().prepare('INSERT INTO rooms (name, topic, owner_id, password) VALUES (?,?,?,?)').run(name, topic || '', ownerId, password || null);
 }
 
-// ─── Socket Middleware (IP block + lockdown) ────────────────────
+// ─── Socket Middleware (IP block only; lockdown checked after auth) ──
 io.use((socket, next) => {
   const ip = getClientIP(socket);
-  if (lockdown && !TRUSTED_IPS.has(ip)) {
-    console.log(`[!] LOCKDOWN blocked connection from ${ip}`);
-    return next(new Error('SERVER IN LOCKDOWN MODE'));
-  }
   if (BLOCKED_IPS.has(ip) && !TRUSTED_IPS.has(ip)) {
     console.log(`[!] BLOCKED connection from ${ip}`);
     return next(new Error('FIREWALL BLOCKED - IP ' + ip));
@@ -370,6 +366,11 @@ io.on('connection', (socket) => {
     if (deviceId) getDB().prepare('UPDATE users SET device_id = ? WHERE id = ?').run(deviceId, u.id);
     session.user = u;
     session.authed = true;
+    if (lockdown && u.role !== 'admin') {
+      socket.emit('auth:error', '⚠ SERVER IN LOCKDOWN MODE - Access denied');
+      socket.disconnect(true);
+      return;
+    }
     if (u.dnd) dndUsers.add(u.username.toLowerCase());
     const online = { id: socket.id, username: u.username, display: u.display_name, color: u.color, role: u.role, ip: u.ip, token: u.token, status: 'online', xp: u.xp || 0, level: u.level || 1, dnd: u.dnd || 0 };
     onlineUsers.set(socket.id, online);
@@ -421,6 +422,42 @@ io.on('connection', (socket) => {
     enforceSingleSession(u.username);
     session.user = u;
     session.authed = true;
+    if (lockdown && u.role !== 'admin') {
+      socket.emit('auth:error', '⚠ SERVER IN LOCKDOWN MODE - Access denied');
+      socket.disconnect(true);
+      return;
+    }
+    if (u.dnd) dndUsers.add(u.username.toLowerCase());
+    const online = { id: socket.id, username: u.username, display: u.display_name, color: u.color, role: u.role, ip: u.ip, token: u.token, status: 'online', xp: u.xp || 0, level: u.level || 1, dnd: u.dnd || 0 };
+
+// This comment marks the regular login path end
+  });
+
+  // ─── Register ──────────────────────────────────────────────
+  socket.on('auth:register', ({ username, password, deviceId, securityAnswer }) => {
+    const clientIP = getClientIP(socket);
+    if (!checkAuthRate(clientIP)) { socket.emit('auth:error', 'ACCESS DENIED - Rate limit exceeded'); return; }
+    if (checkDeviceBan(deviceId, username)) { socket.emit('auth:error', '🚫 Device/IP banned'); return; }
+    if (!username || username.length < 3) { socket.emit('auth:error', 'Username must be at least 3 characters'); return; }
+    const clean = sanitize(username).toLowerCase().slice(0, 20);
+    if (findUser(clean)) { socket.emit('auth:error', 'Username already taken'); return; }
+    if (!password || password.length < 4) { socket.emit('auth:error', 'Password must be at least 4 characters'); return; }
+    const hashed = bcrypt.hashSync(password, 10);
+    const u = createUser(clean, hashed);
+    if (deviceId) {
+      getDB().prepare('UPDATE users SET device_id = ? WHERE id = ?').run(deviceId, u.id);
+    }
+    if (securityAnswer) {
+      getDB().prepare('UPDATE users SET security_answer = ? WHERE id = ?').run(sanitize(securityAnswer).slice(0, 100), u.id);
+    }
+    enforceSingleSession(u.username);
+    session.user = u;
+    session.authed = true;
+    if (lockdown && u.role !== 'admin') {
+      socket.emit('auth:error', '⚠ SERVER IN LOCKDOWN MODE - Access denied');
+      socket.disconnect(true);
+      return;
+    }
     const online = { id: socket.id, username: u.username, display: u.display_name, color: u.color, role: u.role, ip: u.ip, token: u.token, status: 'online' };
     onlineUsers.set(socket.id, online);
     socket.join('lobby');
@@ -449,6 +486,11 @@ io.on('connection', (socket) => {
         getDB().prepare('UPDATE users SET last_login = ? WHERE id = ?').run(Math.floor(Date.now()/1000), existing.id);
         session.user = existing;
         session.authed = true;
+        if (lockdown && existing.role !== 'admin') {
+          socket.emit('auth:error', '⚠ SERVER IN LOCKDOWN MODE - Access denied');
+          socket.disconnect(true);
+          return;
+        }
         enforceSingleSession(existing.username);
         const online = { id: socket.id, username: existing.username, display: existing.display_name, color: existing.color, role: existing.role, ip: existing.ip, token: existing.token, status: 'online', xp: existing.xp || 0, level: existing.level || 1 };
         onlineUsers.set(socket.id, online);
@@ -480,6 +522,11 @@ io.on('connection', (socket) => {
     getDB().prepare('UPDATE users SET last_login = ? WHERE id = ?').run(Math.floor(Date.now()/1000), u.id);
     session.user = u;
     session.authed = true;
+    if (lockdown && u.role !== 'admin') {
+      socket.emit('auth:error', '⚠ SERVER IN LOCKDOWN MODE - Access denied');
+      socket.disconnect(true);
+      return;
+    }
     const online = { id: socket.id, username: u.username, display: u.display_name, color: u.color, role: u.role, ip: u.ip, token: u.token, status: 'online', xp: u.xp || 0, level: u.level || 1 };
     onlineUsers.set(socket.id, online);
     socket.join('lobby');
@@ -739,8 +786,8 @@ io.on('connection', (socket) => {
     io.emit('admin:lockdown', lockdown);
     if (lockdown) {
       for (const [sid, sock] of io.sockets.sockets) {
-        const ip = getClientIP(sock);
-        if (!TRUSTED_IPS.has(ip)) { sock.disconnect(); }
+        const u = onlineUsers.get(sid);
+        if (!u || u.role !== 'admin') { sock.disconnect(true); }
       }
     }
   });
