@@ -18,12 +18,31 @@ const io = new Server(server, {
   pingInterval: 10000,
   transports: ['websocket', 'polling'],
   cors: {
-    origin: '*',
+    origin: [
+      'https://Rayaner45-atlasroot-chat.hf.space',
+      'https://huggingface.co',
+      'https://hf.space',
+    ],
     methods: ['GET', 'POST'],
   },
 });
 
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+      connectSrc: ["'self'", "wss://Rayaner45-atlasroot-chat.hf.space", "https://Rayaner45-atlasroot-chat.hf.space"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+}));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
