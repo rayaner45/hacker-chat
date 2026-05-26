@@ -30,19 +30,31 @@
 
   var bootLines = [
     { text: 'SYS: Booting AtlasRoot v4.0.1', type: 'info', delay: 80 },
-    { text: 'OK  CPU: 4 cores @ 2.8GHz | RAM: 8GB DDR4', type: 'ok', delay: 120 },
-    { text: 'OK  Network: eth0 - 10.0.0.42/24 (LINK UP)', type: 'ok', delay: 100 },
-    { text: 'OK  crypto.ko - AES-NI | netfilter.ko - firewall', type: 'ok', delay: 150 },
-    { text: 'OK  entropy pool: 256/256 bits (sufficient)', type: 'ok', delay: 120 },
-    { text: 'OK  GPG keyring: 4096-bit RSA | 23 trusted CAs', type: 'ok', delay: 150 },
-    { text: 'OK  socket.io@4.7.2 | encryption.service (AES-256-GCM)', type: 'ok', delay: 180 },
-    { text: 'OK  firewall.service (12 rules) | auth.service', type: 'ok', delay: 150 },
-    { text: 'OK  TLS 1.3 handshake (X25519) | session secured', type: 'ok', delay: 200 },
-    { text: 'OK  Message bus | rate limiter | chat protocol ready', type: 'ok', delay: 200 },
-    { text: '', type: 'info', delay: 100 },
-    { text: '> ESTABLISHING SECURE CONNECTION...', type: 'warn', delay: 300 },
-    { text: '', type: 'info', delay: 80 },
-    { text: '> SYSTEM READY. AWAITING AUTHENTICATION...', type: 'warn', delay: 100 },
+    { text: 'OK  CPU: 4 cores @ 2.8GHz | RAM: 8GB DDR4 | L2 cache: 256KB', type: 'ok', delay: 100 },
+    { text: 'OK  POST: Memory test passed (8192MB)', type: 'ok', delay: 90 },
+    { text: 'OK  Network: eth0 - 10.0.0.42/24 (LINK UP | 1Gbps)', type: 'ok', delay: 100 },
+    { text: 'OK  Loading kernel modules: crypto.ko, netfilter.ko, iptables.ko', type: 'ok', delay: 140 },
+    { text: 'OK  entropy pool: 256/256 bits (sufficient)', type: 'ok', delay: 100 },
+    { text: 'OK  GPG keyring: 4096-bit RSA | 23 trusted CAs loaded', type: 'ok', delay: 120 },
+    { text: 'OK  socket.io@4.7.2 | encryption.service (AES-256-GCM)', type: 'ok', delay: 140 },
+    { text: 'OK  firewall.service (12 rules) | auth.service (2FA)', type: 'ok', delay: 130 },
+    { text: 'OK  TLS 1.3 handshake (X25519) | session secured', type: 'ok', delay: 160 },
+    { text: 'WRN  IDS: 3 port scans detected since last boot', type: 'warn', delay: 180 },
+    { text: 'OK  Intrusion prevention: ACTIVE | 0 threats', type: 'ok', delay: 120 },
+    { text: 'OK  Message bus | rate limiter | chat protocol ready', type: 'ok', delay: 140 },
+    { text: 'OK  Tor circuit: 3 hops | IP masked', type: 'ok', delay: 240 },
+    { text: 'OK  Dark web relay: connected to 8 nodes', type: 'ok', delay: 200 },
+    { text: 'OK  Anon DNS: enabled | WebRTC leak protection: ON', type: 'ok', delay: 180 },
+    { text: '', type: 'info', delay: 60 },
+    { text: '> Verifying system integrity...', type: 'warn', delay: 300 },
+    { text: '> Checksums: ALL MATCH (SHA-256 verified)', type: 'ok', delay: 200 },
+    { text: '> Deobfuscating network layers...', type: 'warn', delay: 250 },
+    { text: '', type: 'info', delay: 50 },
+    { text: '> ESTABLISHING SECURE CONNECTION...', type: 'warn', delay: 400 },
+    { text: '> 802.1X authentication: PASSED', type: 'ok', delay: 150 },
+    { text: '> VPN tunnel: ESTABLISHED (WireGuard)', type: 'ok', delay: 200 },
+    { text: '', type: 'info', delay: 50 },
+    { text: '> SYSTEM READY. AWAITING AUTHENTICATION...', type: 'warn', delay: 150 },
   ];
 
   var bootIdx = 0;
@@ -52,7 +64,7 @@
     if (line.text === '') { div.innerHTML = '&nbsp;'; }
     bootOutput.appendChild(div);
     bootOutput.scrollTop = bootOutput.scrollHeight;
-    // Typewriter effect per character
+    // Fast typewriter effect
     var chars = line.text.split('');
     div.textContent = '';
     var ci = 0;
@@ -60,12 +72,12 @@
       if (ci < chars.length) {
         div.textContent += chars[ci++];
         bootOutput.scrollTop = bootOutput.scrollHeight;
-        setTimeout(typeChar, 3 + Math.random() * 6);
+        setTimeout(typeChar, ci % 3 === 0 ? 2 + Math.random() * 2 : 0);
       } else {
         // Line complete
         var pct = Math.floor((bootIdx / bootLines.length) * 100);
         bootBar.style.width = pct + '%';
-        var msgs = ['INITIALIZING SYSTEM...','LOADING MODULES...','CONFIGURING SERVICES...','ESTABLISHING TUNNEL...','FINALIZING...'];
+        var msgs = ['INITIALIZING KERNEL...','LOADING MODULES...','CONFIGURING FIREWALL...','ESTABLISHING TUNNEL...','ENCRYPTING CHANNEL...','FINALIZING...'];
         bootStatus.textContent = msgs[Math.min(Math.floor(bootIdx / bootLines.length * msgs.length), msgs.length - 1)] + ' ' + pct + '%';
         // Activate footer items based on progress
         var fwEl = document.querySelector('.boot-fw');
@@ -114,7 +126,7 @@
             var retries = 100;
             function directLogin() {
               if (App.socket && App.socket.connected) {
-                App.socket.emit('auth:login', { username: App.autoLogin.user, password: App.autoLogin.pass });
+                App.socket.emit('auth:login', { username: App.autoLogin.user, password: App.autoLogin.pass, deviceId: getDeviceId() });
               } else if (retries > 0) { retries--; setTimeout(directLogin, 100); }
             }
             directLogin();
@@ -159,35 +171,34 @@
   function start() {
     resize();
     var cols = Math.floor(canvas.width / 11);
-    var drops = Array(cols).fill(1).map(function () { return Math.random() * 100; });
-    var speeds = Array(cols).fill(1).map(function () { return 0.5 + Math.random() * 1.5; });
-    var brightness = Array(cols).fill(1).map(function () { return 0.3 + Math.random() * 0.7; });
+    var halfCols = Math.floor(cols / 2);
+    var drops = Array(halfCols).fill(1).map(function () { return Math.random() * 100; });
+    var speeds = Array(halfCols).fill(1).map(function () { return 0.5 + Math.random() * 1.5; });
+    var brightness = Array(halfCols).fill(1).map(function () { return 0.3 + Math.random() * 0.7; });
     if (interval) clearInterval(interval);
     interval = setInterval(function () {
       var root = getComputedStyle(document.documentElement);
       var color = root.getPropertyValue('--fg').trim() || '#0f0';
-      ctx.fillStyle = 'rgba(0,0,0,0.04)';
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       for (var i = 0; i < drops.length; i++) {
         var alpha = brightness[i];
-        // Lead character is brighter
         ctx.fillStyle = color;
         ctx.globalAlpha = Math.min(1, alpha + 0.3);
         ctx.font = 'bold 11px monospace';
-        ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 11, drops[i] * 11);
-        // Trail characters are dimmer
-        ctx.globalAlpha = alpha * 0.3;
+        ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 22, drops[i] * 11);
+        ctx.globalAlpha = alpha * 0.25;
         ctx.font = '11px monospace';
-        for (var t = 1; t < 6; t++) {
+        for (var t = 1; t < 4; t++) {
           if (drops[i] - t > 0) {
-            ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 11, (drops[i] - t) * 11);
+            ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 22, (drops[i] - t) * 11);
           }
         }
         ctx.globalAlpha = 1;
         if (drops[i] * 11 > canvas.height && Math.random() > 0.975) drops[i] = 0;
         drops[i] += speeds[i];
       }
-    }, 35);
+    }, 45);
   }
 
   start();
@@ -196,6 +207,68 @@
     if (document.hidden) { if (interval) { clearInterval(interval); interval = null; } }
     else { start(); }
   });
+})();
+
+// ─── Floating Particles ──────────────────────────────────────
+(function () {
+  var canvas = document.getElementById('particles');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var particles = [];
+  var MAX = 25;
+
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (var i = 0; i < MAX; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 2 + 1,
+      alpha: Math.random() * 0.5 + 0.1,
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var style = getComputedStyle(document.documentElement);
+    var color = style.getPropertyValue('--fg').trim() || '#0f0';
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = p.alpha;
+      ctx.fill();
+    }
+    // Draw connecting lines between nearby particles
+    for (var i = 0; i < particles.length; i++) {
+      for (var j = i + 1; j < particles.length; j++) {
+        var dx = particles[i].x - particles[j].x;
+        var dy = particles[i].y - particles[j].y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = color;
+          ctx.globalAlpha = (1 - dist / 120) * 0.08;
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+  }
+  animate();
+
 })();
 
 // ─── Audio ─────────────────────────────────────────────────
@@ -310,6 +383,16 @@ function glitch() {
   el.classList.add('active');
 }
 
+// ─── Device ID (for single-account-per-browser enforcement) ─
+function getDeviceId() {
+  var id = localStorage.getItem('hackerchat-device-id');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : 'd' + Date.now() + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('hackerchat-device-id', id);
+  }
+  return id;
+}
+
 // ─── Application State ─────────────────────────────────────
 var App = {
   socket: null,
@@ -328,7 +411,15 @@ var App = {
   autoLogin: null,
   smoothScroll: true,
 };
-App.socket = io();
+App.socket = io({
+  transports: ['websocket', 'polling'],
+  upgrade: false,
+  timeout: 30000,
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+});
 
 // ─── DOM refs ──────────────────────────────────────────────
 var $ = function (id) { return document.getElementById(id); };
@@ -373,7 +464,7 @@ function addTermLine(text, className) {
 $('login-step1-btn').addEventListener('click', function () {
   var user = $('login-user').value.trim();
   if (!user) { authError.textContent = 'Enter your USER ID'; return; }
-  if (!App.socket || !App.socket.connected) { authError.textContent = 'No connection'; return; }
+  if (!App.socket || !App.socket.connected) { ensureConnection(function(){}); return; }
   App.step1User = user;
   document.querySelectorAll('.auth-form').forEach(function (f) { f.classList.remove('active'); });
   loginStep2.classList.add('active');
@@ -400,15 +491,11 @@ $('login-form').addEventListener('click', function (e) {
   var user = App.step1User || $('login-user').value.trim();
   var pass = $('login-pass').value;
   if (!user || !pass) { authError.textContent = 'Fill all fields'; return; }
-  if (!App.socket || !App.socket.connected) {
-    authError.textContent = 'No connection';
-    addTermLine('NO CONNECTION', 'access-denied');
-    return;
-  }
+  if (!App.socket || !App.socket.connected) { ensureConnection(function(){}); return; }
   authError.textContent = '';
   authTerminal.innerHTML = '';
   addTermLine('DECRYPTING MASTER KEY...', 'processing');
-  App.socket.emit('auth:login', { username: user, password: pass });
+  App.socket.emit('auth:login', { username: user, password: pass, deviceId: getDeviceId() });
 });
 
 $('login-pass').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('login-form').click(); });
@@ -420,15 +507,11 @@ registerForm.addEventListener('submit', function (e) {
   var secAns = ($('reg-sec-answer') ? $('reg-sec-answer').value.trim() : '');
   if (!user || !pass) { authError.textContent = 'Fill all fields'; return; }
   if (pass.length < 4) { authError.textContent = 'Master key 4+ chars'; return; }
-  if (!App.socket || !App.socket.connected) {
-    authError.textContent = 'No connection to server';
-    addTermLine('NO CONNECTION', 'access-denied');
-    return;
-  }
+  if (!App.socket || !App.socket.connected) { ensureConnection(function(){}); return; }
   authError.textContent = '';
   authTerminal.innerHTML = '';
   addTermLine('CREATING ACCOUNT...', 'processing');
-  App.socket.emit('auth:register', { username: user, password: pass, securityAnswer: secAns });
+  App.socket.emit('auth:register', { username: user, password: pass, securityAnswer: secAns, deviceId: getDeviceId() });
 });
 
 // Show security answer field on register tab focus
@@ -439,10 +522,10 @@ document.querySelector('.auth-tab[data-tab="register"]').addEventListener('click
 
 // ─── Guest Login ──────────────────────────────────────────────
 $('guest-btn').addEventListener('click', function () {
-  if (!App.socket || !App.socket.connected) { authError.textContent = 'No connection'; return; }
+  if (!App.socket || !App.socket.connected) { ensureConnection(function(){}); return; }
   authTerminal.innerHTML = '';
   addTermLine('CREATING GUEST ACCOUNT...', 'processing');
-  App.socket.emit('auth:guest');
+  App.socket.emit('auth:guest', { deviceId: getDeviceId() });
 });
 
 // ─── Forget Algorithm (Account Recovery) ──────────────────────
@@ -468,6 +551,12 @@ App.socket.on('auth:error', function (msg) {
   authTerminal.innerHTML = '<div class="term-line access-denied">> ACCESS DENIED</div>';
   initAudio();
   SFX.error();
+});
+App.socket.on('session:duplicate', function (data) {
+  showToast(data.text || '⚠ تم فتح حسابك في مكان آخر، هذه الجلسة مغلقة', 'error');
+  setTimeout(function () {
+    window.location.reload();
+  }, 2000);
 });
 App.socket.on('auth:success', function (data) {
   App.user = data.user;
@@ -614,6 +703,23 @@ App.socket.on('message', function (data) {
     if (data.user && data.type !== 'system' && data.type !== 'whisper') {
       App._lastMsg = { user: data.user, text: data.text || '' };
     }
+    // Shake on unknown command
+    if (data && data.type === 'system' && data.text && data.text.includes('Unknown')) {
+      var inp = document.getElementById('message-input');
+      if (inp) { inp.classList.add('shake'); inp.style.borderColor='#f00'; inp.style.boxShadow='0 0 15px rgba(255,0,0,0.4)'; setTimeout(function(){inp.classList.remove('shake');inp.style.borderColor='';inp.style.boxShadow='';},500); }
+    }
+    // Date separators for user messages
+    if (data.type === 'user') {
+      var today = new Date().toDateString();
+      if (_lastMsgDate !== today) {
+        _lastMsgDate = today;
+        addMessage({ type: 'system', text: '─── ' + today + ' ───' });
+      }
+    }
+    // Whisper sound
+    if (data.type === 'whisper' && App.soundEnabled) {
+      SFX.whisper();
+    }
   } catch (e) {
     console.error('[MSG ERROR]', e);
     // Fallback: append raw text
@@ -646,6 +752,121 @@ App.socket.on('flash', function (data) {
   el.textContent = data.text || '';
   document.body.appendChild(el);
   setTimeout(function () { el.remove(); }, 3000);
+});
+
+// ─── Admin Entry Dramatic Effect ────────────────────────────
+App.socket.on('admin:entered', function (data) {
+  initAudio();
+  SFX.alert();
+  glitch();
+
+  // Screen shake
+  var chatContainer = document.querySelector('.chat-container');
+  if (chatContainer) {
+    chatContainer.style.animation = 'none';
+    void chatContainer.offsetWidth;
+    chatContainer.style.animation = 'screenShake 0.5s ease-out';
+    setTimeout(function () { if (chatContainer) chatContainer.style.animation = ''; }, 600);
+  }
+
+  // Red flash overlay
+  var flashOverlay = document.createElement('div');
+  flashOverlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,0,0,0.15);z-index:9998;pointer-events:none;animation:flashFade 1.5s ease-out forwards';
+  document.body.appendChild(flashOverlay);
+  setTimeout(function () { flashOverlay.remove(); }, 1600);
+
+  // Big dramatic notification in chat
+  var adminMsg = document.createElement('div');
+  adminMsg.className = 'msg-line message system';
+  adminMsg.style.cssText = 'border:1px solid #f44;background:rgba(255,0,0,0.08);padding:8px 12px;margin:6px 0;text-align:center;font-size:12px;font-weight:bold;color:#f44;text-shadow:0 0 20px rgba(255,0,0,0.6),0 0 40px rgba(255,0,0,0.3);letter-spacing:3px;animation:adminEntryPulse 0.8s ease-in-out 3';
+  adminMsg.textContent = '⚠ ' + (data.username || 'ADMIN') + ' HAS ENTERED THE SERVER ⚠';
+  var chatMsgs = document.getElementById('chat-messages');
+  if (chatMsgs) {
+    chatMsgs.appendChild(adminMsg);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    setTimeout(function () { adminMsg.style.opacity = '0.3'; adminMsg.style.transition = 'opacity 2s'; }, 3000);
+  }
+
+  // Flash the title
+  var origTitle = document.title;
+  document.title = '⚠ ' + (data.username || 'ADMIN').toUpperCase() + ' ONLINE ⚠';
+  setTimeout(function () { document.title = origTitle; }, 2000);
+});
+
+App.socket.on('admin:action', function (data) {
+  initAudio();
+  SFX.alert();
+
+  var chatContainer = document.querySelector('.chat-container');
+  if (chatContainer) {
+    chatContainer.style.animation = 'none';
+    void chatContainer.offsetWidth;
+  }
+
+  var flashColor, emoji, titlePrefix, shakeStr, borderColor, bgColor, textColor, glowColor;
+  switch (data.action) {
+    case 'kick':
+      flashColor = 'rgba(255,165,0,0.15)';
+      emoji = '💥';
+      titlePrefix = '💥 KICKED';
+      shakeStr = 'screenShake 0.3s ease-out';
+      borderColor = '#fa0';
+      bgColor = 'rgba(255,165,0,0.08)';
+      textColor = '#fa0';
+      glowColor = 'rgba(255,165,0,0.6)';
+      break;
+    case 'ban':
+      flashColor = 'rgba(255,0,0,0.2)';
+      emoji = '⛔';
+      titlePrefix = '⛔ BANNED';
+      shakeStr = 'screenShake 0.6s ease-out';
+      borderColor = '#f44';
+      bgColor = 'rgba(255,0,0,0.1)';
+      textColor = '#f44';
+      glowColor = 'rgba(255,0,0,0.6)';
+      break;
+    case 'mute':
+      flashColor = 'rgba(255,255,0,0.1)';
+      emoji = '🔇';
+      titlePrefix = '🔇 MUTED';
+      shakeStr = 'screenShake 0.2s ease-out';
+      borderColor = '#ff0';
+      bgColor = 'rgba(255,255,0,0.06)';
+      textColor = '#ff0';
+      glowColor = 'rgba(255,255,0,0.4)';
+      break;
+    default:
+      return;
+  }
+
+  if (chatContainer) {
+    chatContainer.style.animation = shakeStr;
+    setTimeout(function () { if (chatContainer) chatContainer.style.animation = ''; }, 600);
+  }
+
+  var flashOverlay = document.createElement('div');
+  flashOverlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:' + flashColor + ';z-index:9998;pointer-events:none;animation:flashFade 1.5s ease-out forwards';
+  document.body.appendChild(flashOverlay);
+  setTimeout(function () { flashOverlay.remove(); }, 1600);
+
+  var actionMsg = document.createElement('div');
+  actionMsg.className = 'msg-line message system';
+  actionMsg.style.cssText = 'border:1px solid ' + borderColor + ';background:' + bgColor + ';padding:8px 12px;margin:6px 0;text-align:center;font-size:12px;font-weight:bold;color:' + textColor + ';text-shadow:0 0 20px ' + glowColor + ',0 0 40px ' + glowColor.replace('0.6','0.3') + ';letter-spacing:2px;animation:adminEntryPulse 0.8s ease-in-out 3';
+  if (data.action === 'mute') {
+    actionMsg.textContent = emoji + ' ' + data.target + ' MUTED ' + data.minutes + 'min by ' + data.admin + ' ' + emoji;
+  } else {
+    actionMsg.textContent = emoji + ' ' + data.target + ' ' + titlePrefix + ' by ' + data.admin + ' ' + emoji;
+  }
+  var chatMsgs = document.getElementById('chat-messages');
+  if (chatMsgs) {
+    chatMsgs.appendChild(actionMsg);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    setTimeout(function () { actionMsg.style.opacity = '0.3'; actionMsg.style.transition = 'opacity 2s'; }, 3000);
+  }
+
+  var origTitle = document.title;
+  document.title = titlePrefix + ' ' + data.target.toUpperCase();
+  setTimeout(function () { document.title = origTitle; }, 2000);
 });
 
 App.socket.on('playsound', function (effect) {
@@ -885,46 +1106,13 @@ function addMessage(data, noTypewriter) {
     textWrap.className = 'msg-text';
     textWrap.style.cssText = 'margin-top:2px';
     div.appendChild(textWrap);
-    if (!noTypewriter) {
-      var chars = textStr.split('');
-      var ci = 0;
-      function typeChar() {
-        if (ci >= chars.length) return;
-        var ch = chars[ci];
-        if (ch === '<') { textWrap.innerHTML += '&lt;'; ci++; typeChar(); return; }
-        if (ch === '>') { textWrap.innerHTML += '&gt;'; ci++; typeChar(); return; }
-        if (ch === '&') { textWrap.innerHTML += '&amp;'; ci++; typeChar(); return; }
-        if (ch === '@') {
-          var mentionText = '';
-          while (ci < chars.length && /[\w@]/.test(chars[ci])) { mentionText += chars[ci]; ci++; }
-          var mSpan = document.createElement('span');
-          mSpan.className = 'mention';
-          mSpan.textContent = mentionText;
-          textWrap.appendChild(mSpan);
-          if (App.user && mentionText.slice(1).toLowerCase() === App.user.display.toLowerCase()) isMention = true;
-          typeChar(); return;
-        }
-        textWrap.appendChild(document.createTextNode(ch));
-        ci++;
-        if (App.soundEnabled && ch !== ' ' && Math.random() > 0.7) { initAudio(); beep(800 + Math.random()*400, 15); }
-        var delay = ch === ' ' ? 20 : 12 + Math.random() * 16;
-        setTimeout(typeChar, delay);
-      }
-      typeChar();
-    } else {
-      var mentionRe = /@(\w+)/g;
-      var lastIdx = 0;
-      var match;
-      while ((match = mentionRe.exec(textStr)) !== null) {
-        if (match.index > lastIdx) textWrap.appendChild(document.createTextNode(textStr.slice(lastIdx, match.index)));
-        var mentionSpan = document.createElement('span');
-        mentionSpan.className = 'mention';
-        mentionSpan.textContent = match[0];
-        textWrap.appendChild(mentionSpan);
-        lastIdx = mentionRe.lastIndex;
-        if (App.user && match[1].toLowerCase() === App.user.display.toLowerCase()) isMention = true;
-      }
-      if (lastIdx < textStr.length) textWrap.appendChild(document.createTextNode(textStr.slice(lastIdx)));
+    // Fast rendering with mention highlighting
+    textWrap.innerHTML = textStr.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    var mentionMatch = textStr.match(/@(\w+)/g);
+    if (mentionMatch) {
+      mentionMatch.forEach(function(m) {
+        if (App.user && m.slice(1).toLowerCase() === App.user.display.toLowerCase()) isMention = true;
+      });
     }
 
     // Reaction button
@@ -967,6 +1155,8 @@ function renderUsers(users) {
   $('user-count').textContent = users.length;
   var panelCount = document.getElementById('user-count-panel');
   if (panelCount) panelCount.textContent = users.length;
+  var footerCount = document.getElementById('user-count-footer');
+  if (footerCount) footerCount.textContent = users.length + ' online';
   users.forEach(function (u) {
     var div = document.createElement('div');
     var roleClass = u.role === 'admin' ? 'admin' : u.role === 'mod' ? 'mod' : u.role === 'guest' || (u.display || u.username).startsWith('guest_') ? 'guest' : '';
@@ -1243,8 +1433,25 @@ function stopEmergency() {
   if (emergInterval) clearInterval(emergInterval);
 }
 
-emergBtn.addEventListener('click', startEmergency);
-emergDisable.addEventListener('click', stopEmergency);
+emergBtn.addEventListener('click', function () {
+  startEmergency();
+  emergBtn.classList.add('active');
+});
+emergDisable.addEventListener('click', function () {
+  stopEmergency();
+  emergBtn.classList.remove('active');
+});
+
+// Listen for server lockdown state
+App.socket.on('admin:lockdown', function (state) {
+  if (state) {
+    startEmergency();
+    emergBtn.classList.add('active');
+  } else {
+    stopEmergency();
+    emergBtn.classList.remove('active');
+  }
+});
 
 // Live clock in footer
 (function startClock() {
@@ -1395,7 +1602,7 @@ App.socket.on('room:topic', function (data) {
 });
 
 // ─── Commands List (for autocomplete) ──────────────────────
-var COMMANDS = ['help','nick','color','whisper','ping','scan','hack','clear','netstat','encrypt','search','ban','unban','setrole','mute','kick','announce','status','title','whois','time','uptime','motd','join','leave','create','users','room','firewall','blocked','banip','unbanip','clearroom','lockdown','export','sys','ai','grep','sound','reply','profile','rank','unlock','fake_maintenance','export_security_logs'];
+var COMMANDS = ['help','nick','color','whisper','ping','scan','hack','clear','netstat','encrypt','search','ban','unban','setrole','mute','kick','announce','status','title','whois','time','uptime','motd','join','leave','create','users','room','firewall','blocked','banip','unbanip','clearroom','lockdown','export','sys','ai','grep','sound','reply','profile','rank','unlock','fake_maintenance','export_security_logs','del'];
 
 // ─── Send ──────────────────────────────────────────────────
 function send() {
@@ -1494,29 +1701,66 @@ if (savedTheme) {
   });
 }
 
-// ─── Connection status ─────────────────────────────────────
+// ─── Connection management ─────────────────────────────────
+App.connError = null;
+function updateAuthConnStatus() {
+  var el = document.getElementById('auth-conn-status');
+  if (!el) return;
+  if (App.socket && App.socket.connected) {
+    el.textContent = '● CONNECTED';
+    el.style.color = '#0f0';
+  } else if (App.socket && App.socket.connecting) {
+    el.textContent = '○ CONNECTING...';
+    el.style.color = '#ff0';
+  } else {
+    el.textContent = '✕ ' + (App.connError || 'DISCONNECTED');
+    el.style.color = '#f44';
+  }
+}
 App.socket.on('connect', function () {
   console.log('[SOCKET] connected');
   $('conn-status').textContent = 'connected';
+  App.connError = null;
+  updateAuthConnStatus();
 });
 App.socket.on('disconnect', function (reason) {
   console.warn('[SOCKET] disconnected:', reason);
   $('conn-status').textContent = 'disconnected';
+  updateAuthConnStatus();
   addMessage({ type: 'system', text: '[!] Connection lost. Attempting to reconnect...', time: '' });
 });
 App.socket.on('connect_error', function (err) {
   console.error('[SOCKET] error:', err.message);
+  App.connError = err.message;
   $('conn-status').textContent = 'ERROR';
+  updateAuthConnStatus();
 });
 App.socket.on('reconnect_attempt', function () {
   console.log('[SOCKET] reconnecting...');
   $('conn-status').textContent = 'reconnecting...';
+  updateAuthConnStatus();
 });
 App.socket.on('reconnect', function () {
   console.log('[SOCKET] reconnected');
   $('conn-status').textContent = 'connected';
+  App.connError = null;
+  updateAuthConnStatus();
   addMessage({ type: 'system', text: '[>] Connection restored', time: '' });
 });
+
+function ensureConnection(callback) {
+  if (App.socket && App.socket.connected) { callback(); return; }
+  var status;
+  if (!App.socket) status = 'socket not initialized';
+  else if (App.socket.connecting) status = 'connecting...';
+  else status = App.connError || 'disconnected';
+  authError.innerHTML = 'No connection (' + status + ')<br><small style="color:#f80;cursor:pointer" onclick="App.socket.connect();authError.innerHTML=\'Connecting...\';updateAuthConnStatus()">[retry]</small>';
+  addTermLine('CONNECTION ERROR: ' + status.toUpperCase(), 'access-denied');
+  if (App.socket && !App.socket.connected) { App.socket.connect(); updateAuthConnStatus(); }
+}
+
+// Initial auth connection status
+setTimeout(updateAuthConnStatus, 500);
 
 // ─── Lobby Live Stats ──────────────────────────────────────
 App.socket.on('lobby:stats', function (stats) {
@@ -1533,15 +1777,54 @@ App.socket.on('lobby:stats', function (stats) {
     '<span style="color:#f44">INTRUSION: ' + (stats.lastIntrusion || 'None').slice(0,30) + '</span>';
 });
 
-// ─── Fake Maintenance Handler ───────────────────────────────
+// ─── Fake Maintenance Handler (Hacker Movie Style) ─────────
 App.socket.on('maintenance', function (data) {
   var overlay = document.getElementById('maintenance-overlay');
   if (!overlay) return;
   if (data.active) {
     overlay.style.display = 'flex';
     if (data.msg) document.getElementById('maintenance-msg').textContent = data.msg;
+    // Start animated maintenance sequence
+    var output = document.getElementById('maintenance-output');
+    var bar = document.getElementById('maint-progress-bar');
+    var status = document.getElementById('maint-status');
+    if (App._maintInterval) clearInterval(App._maintInterval);
+    var maintLines = [
+      '> Initializing emergency protocol...',
+      '> Encrypting all traffic (AES-256)...',
+      '> Firewall: 12 rules updated',
+      '> System integrity check: RUNNING',
+      '> Scanning for rootkits...',
+      '> Kernel modules: 23 loaded, 0 suspicious',
+      '> Network connections: 142 active',
+      '> IDS/IPS: 3 threats blocked',
+      '> Memory dump: analyzing...',
+      '> Decoy routing active: 8 nodes',
+      '> Fake services online: 12',
+      '> Honeypot traps: ACTIVE',
+      '> All ports redirected to honeypot',
+      '> Intruder trace: routed to 10.0.0.1',
+      '> SYSTEM LOCKED - MAINTENANCE MODE',
+    ];
+    var idx = 0;
+    var width = 0;
+    if (App._maintTick) clearInterval(App._maintTick);
+    App._maintTick = setInterval(function () {
+      if (idx < maintLines.length) {
+        var div = document.createElement('div');
+        div.className = 'line maint-line';
+        div.textContent = maintLines[idx];
+        output.appendChild(div);
+        output.scrollTop = output.scrollHeight;
+        idx++;
+        width = Math.min(100, Math.floor((idx / maintLines.length) * 100));
+        if (bar) bar.style.width = width + '%';
+        if (status) status.textContent = width + '% - ' + maintLines[Math.min(idx, maintLines.length - 1)].replace('> ', '');
+      }
+    }, 800);
   } else {
     overlay.style.display = 'none';
+    if (App._maintTick) { clearInterval(App._maintTick); App._maintTick = null; }
   }
 });
 document.getElementById('maintenance-refresh').addEventListener('click', function () {
@@ -1734,28 +2017,6 @@ document.getElementById('admin-lockdown-btn').addEventListener('click', function
   }
 });
 
-// Blocked IPs display
-App.socket.on('firewall:blocked', function (ips) {
-  var container = document.getElementById('admin-blocked-ips');
-  container.innerHTML = '';
-  if (!ips || ips.length === 0) {
-    container.innerHTML = '<div style="color:var(--fg-dark);font-size:10px;padding:8px;text-align:center">No blocked IPs</div>';
-    return;
-  }
-  ips.forEach(function (ip) {
-    var div = document.createElement('div');
-    div.style.cssText = 'padding:3px 8px;font-size:9px;color:var(--fg-dim);border-bottom:1px solid rgba(0,255,0,0.03);display:flex;justify-content:space-between';
-    div.innerHTML = '<span>' + ip + '</span><button class="adm-btn" onclick="App.socket.emit(\'admin:unblockip\',{ip:\'' + ip + '\'});this.parentElement.remove()">UNBLOCK</button>';
-    container.appendChild(div);
-  });
-});
-
-// Hook into existing server:stats to get blocked IPs
-var origStatsHandler = App.socket.on;
-App.socket.on('server:stats', function (stats) {
-  // Already handled above
-});
-
 // Set admin status
 function setAdminStatus(msg) {
   var el = document.getElementById('admin-status');
@@ -1938,7 +2199,7 @@ function renderPrivateMessages(user) {
     if (found) color = found.color || '#0f0';
     div.innerHTML =
       '<div class="private-chat-msg-user" style="color:'+color+'">' + (m.incoming ? m.from : 'you') + '</div>' +
-      '<div class="private-chat-msg-text">' + escapeHtml(m.text) + '</div>' +
+      '<div class="private-chat-msg-text">' + m.text + '</div>' +
       '<div class="private-chat-msg-time">' + (m.time||'') + '</div>';
     msgArea.appendChild(div);
   });
@@ -2007,7 +2268,6 @@ function toggleFocus(enable) {
     });
   }
   setupDropdown('status-btn', 'status-menu');
-  setupDropdown('input-status-btn', 'input-status-menu');
   document.addEventListener('click', function () {
     document.querySelectorAll('.status-dropdown-menu').forEach(function (m) { m.classList.remove('show'); });
   });
@@ -2038,8 +2298,8 @@ function toggleFocus(enable) {
       var a = this.dataset.action; ctx.classList.remove('show');
       if (a === 'copy' && msgText) navigator.clipboard.writeText(msgText).catch(function(){});
       else if (a === 'reply' && msgUser) { messageInput.value = '/reply ' + msgUser + ' '; messageInput.focus(); }
-      else if (a === 'report' && msgUser) { App.socket.emit('command', '/report '+msgUser); addMessage({type:'system',text:'[✓] Reported '+msgUser}); }
-      else if (a === 'delete' && msgId && App.user && App.user.role === 'admin') { App.socket.emit('command', '/delete '+msgId); }
+      else if (a === 'report' && msgUser) { App.socket.emit('message', '/report '+msgUser); addMessage({type:'system',text:'[✓] Reported '+msgUser}); }
+      else if (a === 'delete' && msgId && App.user && App.user.role === 'admin') { App.socket.emit('message', '/del '+msgId); }
     });
   });
 })();
@@ -2088,18 +2348,13 @@ function toggleReact(el, emoji) {
 // ─── Override send: focus + spinner + welcome ──────────────
 var _origSend = send;
 send = function (text) {
-  if (text === '/focus on' || text === '/focus') { toggleFocus(true); addMessage({type:'system',text:'[✓] Focus ON'}); return; }
-  if (text === '/focus off') { toggleFocus(false); addMessage({type:'system',text:'[✓] Focus OFF'}); return; }
+  if (text === undefined) text = messageInput.value.trim();
+  if (text === '/focus on' || text === '/focus') { messageInput.value = ''; toggleFocus(true); addMessage({type:'system',text:'[✓] Focus ON'}); return; }
+  if (text === '/focus off') { messageInput.value = ''; toggleFocus(false); addMessage({type:'system',text:'[✓] Focus OFF'}); return; }
   _origSend(text);
 };
 
-// ─── Shake on Unknown command ──────────────────────────────
-App.socket.on('message', function (data) {
-  if (data && data.type === 'system' && data.text && data.text.includes('Unknown')) {
-    var inp = document.getElementById('message-input');
-    if (inp) { inp.classList.add('shake'); inp.style.borderColor='#f00'; inp.style.boxShadow='0 0 15px rgba(255,0,0,0.4)'; setTimeout(function(){inp.classList.remove('shake');inp.style.borderColor='';inp.style.boxShadow='';},500); }
-  }
-});
+
 
 // ─── Welcome message ──────────────────────────────────────
 var WELCOME_SET = ['🔓 Access granted, operator.','⚡ Connection stabilized. Welcome.','🛡️ Secure channel established.','👋 Good to see you!','🔐 AES-256 handshake complete.','🌐 Node authenticated. Hello.','✅ Identity verified. Welcome aboard.','🖥️ Terminal unlocked. Ready.','📡 Signal encrypted. You are secure.','⚙️ System ready. Awaiting commands.'];
@@ -2122,25 +2377,9 @@ App.socket.on('room:joined', function () {
   });
 })();
 
-// ─── Date separators ───────────────────────────────────────
 var _lastMsgDate = '';
-App.socket.on('message', function (data) {
-  if (data.type === 'user') {
-    var today = new Date().toDateString();
-    if (_lastMsgDate !== today) {
-      _lastMsgDate = today;
-      addMessage({ type: 'system', text: '─── ' + today + ' ───' });
-    }
-  }
-});
 
-// ─── Whisper sound (different tone) ─────────────────────────
-var _origMsgSound = App.socket._callbacks && App.socket._callbacks.message;
-App.socket.on('message', function (data) {
-  if (data.type === 'whisper' && App.soundEnabled) {
-    SFX.whisper();
-  }
-});
+
 
 // ─── Toast Notification System ─────────────────────────────
 function showToast(msg, icon, type) {
@@ -2162,6 +2401,36 @@ function closeToast(el) {
   el.classList.add('toast-out');
   setTimeout(function () { if (el.parentNode) el.remove(); }, 300);
 }
+
+// ─── Desktop Notifications ──────────────────────────────────
+function notifyDesktop(title, body, icon) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body: body, icon: icon || '/favicon.ico' });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission();
+  }
+}
+
+// Request permission on user interaction
+document.addEventListener('click', function reqNotif() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  document.removeEventListener('click', reqNotif);
+}, { once: true });
+
+// Trigger desktop notification on whisper when tab is hidden
+var _origAddMsgNotif = addMessage;
+addMessage = function(data, noType) {
+  _origAddMsgNotif(data, noType);
+  if ((data.type === 'whisper' || data.type === 'whisper-sent') && document.hidden) {
+    notifyDesktop(
+      data.type === 'whisper' ? '🔔 Whisper from ' + data.from : '💬 Whisper sent',
+      data.text ? data.text.slice(0, 80) : '(no text)'
+    );
+  }
+};
 
 // ─── Ripple Effect on Buttons ──────────────────────────────
 document.addEventListener('click', function (e) {
@@ -2214,10 +2483,21 @@ document.querySelectorAll('.emoji-strip-btn').forEach(function (btn) {
 (function () {
   var modal = document.getElementById('search-modal');
   var close = document.getElementById('search-modal-close');
-  var searchBtn = document.getElementById('search-btn');
-  var searchInput = document.getElementById('search-input');
-  var results = document.getElementById('search-results');
-  if (!modal || !close || !searchBtn || !searchInput || !results) return;
+var searchBtn = document.getElementById('search-btn');
+var searchInput = document.getElementById('search-input');
+var results = document.getElementById('search-results');
+if (!modal || !close || !searchBtn || !searchInput || !results) return;
+
+// Quick-search button in input area
+var msgSearchBtn = document.getElementById('msg-search-btn');
+if (msgSearchBtn) {
+  msgSearchBtn.addEventListener('click', function () {
+    modal.classList.add('active');
+    searchInput.value = '';
+    searchInput.focus();
+    results.innerHTML = '';
+  });
+}
 
   // Ctrl+F to open
   document.addEventListener('keydown', function (e) {
@@ -2353,18 +2633,18 @@ document.querySelectorAll('.emoji-strip-btn').forEach(function (btn) {
     var atMatch = before.match(/@(\w*)$/);
     if (atMatch) {
       var q = atMatch[1].toLowerCase();
-      var matches = _users.filter(function(u) { return (u.displayName||u.username).toLowerCase().includes(q); }).slice(0, 8);
+      var matches = _users.filter(function(u) { return (u.display||u.username).toLowerCase().includes(q); }).slice(0, 8);
       if (matches.length) {
         container.innerHTML = '';
         container.style.display = 'block';
         matches.forEach(function(u) {
           var item = document.createElement('div');
           item.style.cssText = 'padding:3px 6px;cursor:pointer;color:var(--fg-dark);transition:background 0.1s';
-          item.innerHTML = (u.color ? '<span style="color:'+u.color+'">●</span> ' : '') + (u.displayName||u.username);
+          item.innerHTML = (u.color ? '<span style="color:'+u.color+'">●</span> ' : '') + (u.display||u.username);
           item.addEventListener('click', function() {
             var atPos = txt.lastIndexOf('@', caret - 1);
-            input.value = txt.slice(0, atPos) + '@' + (u.displayName||u.username) + ' ' + txt.slice(caret);
-            input.selectionStart = input.selectionEnd = atPos + (u.displayName||u.username).length + 2;
+            input.value = txt.slice(0, atPos) + '@' + (u.display||u.username) + ' ' + txt.slice(caret);
+            input.selectionStart = input.selectionEnd = atPos + (u.display||u.username).length + 2;
             input.focus();
             container.style.display = 'none';
           });

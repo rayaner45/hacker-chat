@@ -1,8 +1,9 @@
+require('dotenv').config();
 const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, 'data', 'hackerchat.db');
+const DB_PATH = process.env.DATABASE_PATH || '/app/data/hackerchat.db';
 
 let db;
 
@@ -95,6 +96,14 @@ function initTables() {
   try { db.exec('ALTER TABLE users ADD COLUMN dnd INTEGER DEFAULT 0'); } catch (e) {}
   try { db.exec('ALTER TABLE users ADD COLUMN last_login INTEGER DEFAULT 0'); } catch (e) {}
   try { db.exec('ALTER TABLE users ADD COLUMN favorite_cmds TEXT DEFAULT ""'); } catch (e) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN device_id TEXT DEFAULT ""'); } catch (e) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN device_banned INTEGER DEFAULT 0'); } catch (e) {}
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS device_bans (
+      device_id TEXT PRIMARY KEY,
+      banned_at INTEGER DEFAULT (unixepoch())
+    );
+  `);
   // Seed default lobby room if missing
   const exists = db.prepare('SELECT id FROM rooms WHERE name = ?').get('lobby');
   if (!exists) {

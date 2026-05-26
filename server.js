@@ -16,6 +16,11 @@ const io = new Server(server, {
   maxHttpBufferSize: 5e6,
   pingTimeout: 30000,
   pingInterval: 10000,
+  transports: ['websocket', 'polling'],
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
 });
 
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -31,11 +36,12 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // ─── Constants ───────────────────────────────────────────────
-const COLORS = ['#0f0', '#0ff', '#f0f', '#ff0', '#f80', '#8f0', '#f00', '#0fa', '#fa0', '#0ff', '#f0f'];
+const COLORS = ['#0f0', '#0ff', '#f0f', '#ff0', '#f80', '#8f0', '#f00', '#0fa', '#fa0', '#f0f'];
 const MSG_RATE = { window: 2000, max: 4 };
 const rateMap = new Map();
 const authRateMap = new Map();
 const onlineUsers = new Map();
+const userSockets = new Map(); // username → socket.id (single session enforcement)
 const socketIntervals = new Map();
 const TYPING_TIMEOUT = 1500;
 const ADMIN_WHITELIST = (process.env.ADMIN_IPS || '').split(',').filter(Boolean);
@@ -204,9 +210,13 @@ function createRoom(name, topic, ownerId, password) {
   getDB().prepare('INSERT INTO rooms (name, topic, owner_id, password) VALUES (?,?,?,?)').run(name, topic || '', ownerId, password || null);
 }
 
-// ─── Socket Middleware (IP block only) ─────────────────────────
+// ─── Socket Middleware (IP block + lockdown) ────────────────────
 io.use((socket, next) => {
   const ip = getClientIP(socket);
+  if (lockdown && !TRUSTED_IPS.has(ip)) {
+    console.log(`[!] LOCKDOWN blocked connection from ${ip}`);
+    return next(new Error('SERVER IN LOCKDOWN MODE'));
+  }
   if (BLOCKED_IPS.has(ip) && !TRUSTED_IPS.has(ip)) {
     console.log(`[!] BLOCKED connection from ${ip}`);
     return next(new Error('FIREWALL BLOCKED - IP ' + ip));
@@ -219,6 +229,24 @@ io.on('connection', (socket) => {
   console.log(`[+] ${socket.id} from ${clientIP}`);
 
   let session = { user: null, room: 'lobby', authed: false, typingTimer: null, ip: clientIP };
+
+  // ─── Single Session Enforcement ───────────────────────────────
+  function enforceSingleSession(username) {
+    if (!username) return false;
+    const key = username.toLowerCase();
+    const oldSocketId = userSockets.get(key);
+    if (oldSocketId && oldSocketId !== socket.id) {
+      const oldSock = io.sockets.sockets.get(oldSocketId);
+      if (oldSock) {
+        oldSock.emit('session:duplicate', { text: '⚠ تم فتح حسابك في مكان آخر، هذه الجلسة مغلقة' });
+        setTimeout(() => oldSock.disconnect(), 500);
+      }
+      userSockets.delete(key);
+      onlineUsers.delete(oldSocketId);
+    }
+    userSockets.set(key, socket.id);
+    return !!oldSocketId;
+  }
 
   // Send initial state
   socket.emit('init', { id: socket.id, rooms: getRooms() });
@@ -236,9 +264,34 @@ io.on('connection', (socket) => {
   }
 
   // ─── Auth ──────────────────────────────────────────────────
-  socket.on('auth:login', ({ username, password }) => {
+  function isDeviceBanned(deviceId) {
+    if (!deviceId) return false;
+    return getDB().prepare('SELECT 1 FROM device_bans WHERE device_id = ?').get(deviceId);
+  }
+
+  function checkDeviceBan(deviceId, username) {
+    if (isDeviceBanned(deviceId)) {
+      console.log(`[auth] DEVICE BANNED: device=${deviceId} user=${username}`);
+      return true;
+    }
+    // Also check if user's stored device_id is banned
+    if (username) {
+      const u = findUser(username);
+      if (u && u.device_banned) return true;
+    }
+    return false;
+  }
+
+  socket.on('auth:login', ({ username, password, deviceId }) => {
     const clientIP = getClientIP(socket);
-    console.log(`[auth:login] user=${username} ip=${clientIP} trusted=${TRUSTED_IPS.has(clientIP)}`);
+    console.log(`[auth:login] user=${username} ip=${clientIP} device=${deviceId} trusted=${TRUSTED_IPS.has(clientIP)}`);
+
+    if (checkDeviceBan(deviceId, username)) {
+      socket.emit('auth:error', '🚫 تم حظر جهازك من الدخول إلى هذا الموقع');
+      return;
+    }
+
+    enforceSingleSession(username);
 
     // VIP Bypass: raayn5555 or VIP IPs auto-login as admin
     const isVIP = VIP_USERS.includes((username || '').toLowerCase()) || VIP_IPS.has(clientIP);
@@ -254,6 +307,7 @@ io.on('connection', (socket) => {
         u.role = 'admin';
       }
       getDB().prepare('UPDATE users SET last_login = ? WHERE id = ?').run(Math.floor(Date.now()/1000), u.id);
+      if (deviceId) getDB().prepare('UPDATE users SET device_id = ? WHERE id = ?').run(deviceId, u.id);
       session.user = u;
       session.authed = true;
       if (u.dnd) dndUsers.add(u.username.toLowerCase());
@@ -265,8 +319,13 @@ io.on('connection', (socket) => {
       socket.emit('room:joined', { room: 'lobby', topic: 'General discussion' });
     const welcomeMsg = WELCOME_MSGS[Math.floor(Math.random() * WELCOME_MSGS.length)].replace('{user}', u.display_name);
     socket.emit('message', { type: 'system', text: welcomeMsg, time: now() });
-    io.to('lobby').emit('message', { type: 'system', text: `${u.display_name} joined the channel`, time: now() });
-    if (u.role === 'admin') { io.to('lobby').emit('flash', { text: `${u.display_name} [ADMIN] is online`, color: '#f44' }); }
+    if (u.role === 'admin') {
+      io.to('lobby').emit('message', { type: 'system', text: `╔══ ${'═'.repeat(30)} ╗<br>║  🔥 ${u.display_name} [ADMIN] HAS ENTERED THE SERVER 🔥  ║<br>╚══ ${'═'.repeat(30)} ╝`, time: now() });
+      io.to('lobby').emit('flash', { text: `${u.display_name} [ADMIN] is online`, color: '#f44' });
+      io.to('lobby').emit('admin:entered', { username: u.display_name, color: u.color || '#f44' });
+    } else {
+      io.to('lobby').emit('message', { type: 'system', text: `${u.display_name} joined the channel`, time: now() });
+    }
     broadcastUsers();
       emitRoomUpdate();
       sendHistory(socket, 'lobby');
@@ -283,7 +342,9 @@ io.on('connection', (socket) => {
       socket.emit('auth:error', 'ACCESS DENIED - Admin IP not in firewall whitelist. Contact root.');
       return;
     }
+    enforceSingleSession(u.username);
     getDB().prepare('UPDATE users SET last_login = ? WHERE id = ?').run(Math.floor(Date.now()/1000), u.id);
+    if (deviceId) getDB().prepare('UPDATE users SET device_id = ? WHERE id = ?').run(deviceId, u.id);
     session.user = u;
     session.authed = true;
     if (u.dnd) dndUsers.add(u.username.toLowerCase());
@@ -295,13 +356,19 @@ io.on('connection', (socket) => {
     socket.emit('room:joined', { room: 'lobby', topic: 'General discussion' });
     const welcomeMsg = WELCOME_MSGS[Math.floor(Math.random() * WELCOME_MSGS.length)].replace('{user}', u.display_name);
     socket.emit('message', { type: 'system', text: welcomeMsg, time: now() });
-    io.to('lobby').emit('message', { type: 'system', text: `${u.display_name} joined the channel`, time: now() });
+    if (u.role === 'admin') {
+      io.to('lobby').emit('message', { type: 'system', text: `╔══ ${'═'.repeat(30)} ╗<br>║  🔥 ${u.display_name} [ADMIN] HAS ENTERED THE SERVER 🔥  ║<br>╚══ ${'═'.repeat(30)} ╝`, time: now() });
+      io.to('lobby').emit('flash', { text: `${u.display_name} [ADMIN] is online`, color: '#f44' });
+      io.to('lobby').emit('admin:entered', { username: u.display_name, color: u.color || '#f44' });
+    } else {
+      io.to('lobby').emit('message', { type: 'system', text: `${u.display_name} joined the channel`, time: now() });
+    }
     broadcastUsers();
     emitRoomUpdate();
     sendHistory(socket, 'lobby');
   });
 
-  socket.on('auth:register', ({ username, password, securityAnswer }) => {
+  socket.on('auth:register', ({ username, password, securityAnswer, deviceId }) => {
     const clientIP = getClientIP(socket);
     if (!checkAuthRate(clientIP)) { socket.emit('auth:error', 'ACCESS DENIED - Rate limit exceeded. Try again later.'); return; }
     if (!username || !password) { socket.emit('auth:error', 'Username and password required'); return; }
@@ -309,10 +376,26 @@ io.on('connection', (socket) => {
     if (clean.length < 3) { socket.emit('auth:error', 'Username must be 3+ characters'); return; }
     if (password.length < 4) { socket.emit('auth:error', 'Password must be 4+ characters'); return; }
     if (findUser(clean)) { socket.emit('auth:error', 'Username taken'); return; }
+    if (checkDeviceBan(deviceId, clean)) {
+      socket.emit('auth:error', '🚫 تم حظر جهازك من الدخول إلى هذا الموقع');
+      return;
+    }
+    // One account per device
+    if (deviceId) {
+      const existing = getDB().prepare('SELECT username FROM users WHERE device_id = ?').get(deviceId);
+      if (existing) {
+        socket.emit('auth:error', 'لا يمكنك إنشاء أكثر من حساب واحد من هذا المتصفح');
+        return;
+      }
+    }
     const u = createUser(clean, password);
+    if (deviceId) {
+      getDB().prepare('UPDATE users SET device_id = ? WHERE id = ?').run(deviceId, u.id);
+    }
     if (securityAnswer) {
       getDB().prepare('UPDATE users SET security_answer = ? WHERE id = ?').run(sanitize(securityAnswer).slice(0, 100), u.id);
     }
+    enforceSingleSession(u.username);
     session.user = u;
     session.authed = true;
     const online = { id: socket.id, username: u.username, display: u.display_name, color: u.color, role: u.role, ip: u.ip, token: u.token, status: 'online' };
@@ -328,9 +411,21 @@ io.on('connection', (socket) => {
   });
 
   // ─── Guest Login ─────────────────────────────────────────────
-  socket.on('auth:guest', () => {
+  socket.on('auth:guest', ({ deviceId } = {}) => {
     const clientIP = getClientIP(socket);
     if (!checkAuthRate(clientIP)) { socket.emit('auth:error', 'ACCESS DENIED - Rate limit exceeded. Try again later.'); return; }
+    if (checkDeviceBan(deviceId)) {
+      socket.emit('auth:error', '🚫 تم حظر جهازك من الدخول إلى هذا الموقع');
+      return;
+    }
+    // One account per device for guests too
+    if (deviceId) {
+      const existing = getDB().prepare('SELECT username FROM users WHERE device_id = ?').get(deviceId);
+      if (existing) {
+        socket.emit('auth:error', 'لا يمكنك إنشاء أكثر من حساب واحد من هذا المتصفح');
+        return;
+      }
+    }
     var n = 1;
     var guestName;
     do {
@@ -339,6 +434,10 @@ io.on('connection', (socket) => {
     } while (findUser(guestName));
     const guestPass = uuidv4().slice(0, 8);
     const u = createUser(guestName, guestPass);
+    if (deviceId) {
+      getDB().prepare('UPDATE users SET device_id = ? WHERE id = ?').run(deviceId, u.id);
+    }
+    enforceSingleSession(u.username);
     getDB().prepare('UPDATE users SET last_login = ? WHERE id = ?').run(Math.floor(Date.now()/1000), u.id);
     session.user = u;
     session.authed = true;
@@ -501,9 +600,15 @@ io.on('connection', (socket) => {
     if (!user) { socket.emit('message', { type: 'system', text: '[!] User not found', time: now() }); return; }
     db.prepare('UPDATE users SET banned = 1 WHERE id = ?').run(userId);
     db.prepare('INSERT INTO bans (username, room_id, banned_by, reason) VALUES (?,?,?,?)').run(user.username, null, session.user.id, 'Banned via admin panel');
+    // Also ban the device if present
+    if (user.device_id) {
+      db.prepare('INSERT OR IGNORE INTO device_bans (device_id) VALUES (?)').run(user.device_id);
+      db.prepare('UPDATE users SET device_banned = 1 WHERE id = ?').run(userId);
+    }
     const ts = findOnlineSocket(user.username);
     if (ts) { ts.emit('message', {type:'system',text:'[!] YOU HAVE BEEN BANNED',time:now()}); ts.disconnect(); }
     socket.emit('message', {type:'system',text:`[!] ${user.username} BANNED`,time:now()});
+    io.to('lobby').emit('admin:action', { action: 'ban', target: user.username, admin: session.user.display_name });
   });
 
   socket.on('admin:unban', ({ userId }) => {
@@ -592,6 +697,7 @@ io.on('connection', (socket) => {
     if (!session.authed || session.user.role !== 'admin') return;
     lockdown = !lockdown;
     broadcastAllRooms(`[!] LOCKDOWN ${lockdown ? 'ACTIVATED' : 'DEACTIVATED'} by ${session.user.display_name}`);
+    io.emit('admin:lockdown', lockdown);
     if (lockdown) {
       for (const [sid, sock] of io.sockets.sockets) {
         const ip = getClientIP(sock);
@@ -733,8 +839,13 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     clearSocketIntervals(socket.id);
     rateMap.delete(socket.id);
+    replyTimerMap.delete(socket.id);
+    xpRateMap.delete(socket.id);
     if (session.typingTimer) clearTimeout(session.typingTimer);
     if (session.user) {
+      const key = session.user.username.toLowerCase();
+      // Only delete if this socket owns the mapping
+      if (userSockets.get(key) === socket.id) userSockets.delete(key);
       io.to(session.room).emit('message', { type: 'system', text: `${session.user.display_name} left the channel`, time: now() });
     }
     onlineUsers.delete(socket.id);
@@ -839,6 +950,7 @@ function handleCommand(socket, session, text) {
           '║ /whois &lt;u&gt;   - Full user info       ║',
           '║ /motd &lt;m&gt;    - Message of the day   ║',
           '║ /fake_maintenance on|off - Fake maint║',
+          '║ /del &lt;id&gt;    - Delete message        ║',
           '║ /export_security_logs - Export logs ║',
         ] : []),
         '╚══════════════════════════════════════╝',
@@ -966,8 +1078,11 @@ function handleCommand(socket, session, text) {
       if (session.user.role !== 'admin' && session.user.role !== 'mod') { respond('[!] Admin only'); return; }
       if (!args[0]) { respond('Usage: /kick &lt;user&gt;'); return; }
       const targetSock = findOnlineSocket(args[0]);
-      if (targetSock) { targetSock.disconnect(); broadcast(`[!] ${args[0]} kicked by ${session.user.display_name}`); }
-      else { respond('[!] User not found'); }
+      if (targetSock) {
+        targetSock.disconnect();
+        broadcast(`[!] ${args[0]} kicked by ${session.user.display_name}`);
+        io.to('lobby').emit('admin:action', { action: 'kick', target: args[0], admin: session.user.display_name });
+      } else { respond('[!] User not found'); }
       break;
 
     case 'ban':
@@ -978,9 +1093,14 @@ function handleCommand(socket, session, text) {
       getDB().prepare('UPDATE users SET banned = 1 WHERE id = ?').run(bannedUser.id);
       getDB().prepare('INSERT INTO bans (username, room_id, banned_by, reason) VALUES (?,?,?,?)')
         .run(args[0], null, session.user.id, args.slice(1).join(' ') || 'No reason');
+      if (bannedUser.device_id) {
+        getDB().prepare('INSERT OR IGNORE INTO device_bans (device_id) VALUES (?)').run(bannedUser.device_id);
+        getDB().prepare('UPDATE users SET device_banned = 1 WHERE id = ?').run(bannedUser.id);
+      }
       const ts = findOnlineSocket(args[0]);
       if (ts) { ts.emit('message', {type:'system',text:'[!] YOU HAVE BEEN BANNED',time:now()}); ts.disconnect(); }
       broadcast(`[!] ${args[0]} BANNED by ${session.user.display_name}`);
+      io.to('lobby').emit('admin:action', { action: 'ban', target: args[0], admin: session.user.display_name });
       break;
 
     case 'mute':
@@ -993,6 +1113,7 @@ function handleCommand(socket, session, text) {
       const muteSock = findOnlineSocket(args[0]);
       if (muteSock) muteSock.emit('message', {type:'system',text:`[!] MUTED for ${muteMin} min by ${session.user.display_name}`,time:now()});
       broadcast(`[!] ${args[0]} MUTED ${muteMin}min by ${session.user.display_name}`);
+      io.to('lobby').emit('admin:action', { action: 'mute', target: args[0], admin: session.user.display_name, minutes: muteMin });
       break;
 
     case 'announce':
@@ -1172,8 +1293,9 @@ function handleCommand(socket, session, text) {
       const roleUser = findUser(args[0]);
       if (!roleUser) { respond('[!] User not found'); return; }
       getDB().prepare('UPDATE users SET role = ? WHERE id = ?').run(args[1], roleUser.id);
-      const roleSock = findOnlineSocket(args[0]);
-      if (roleSock && roleSock.data) roleSock.data.role = args[1];
+      for (const [sid, u] of onlineUsers) {
+        if (u.username.toLowerCase() === args[0].toLowerCase()) { u.role = args[1]; break; }
+      }
       broadcastUsers();
       respond(`[+] ${args[0]} role set to ${args[1]}`);
       break;
@@ -1433,7 +1555,7 @@ function handleCommand(socket, session, text) {
       if (!spectatorSessions.has(socket.id)) { respond('[!] Not in spectator mode'); return; }
       spectatorSessions.delete(socket.id);
       const prevRoom = session.room;
-      const onlineSpec = { id: socket.id, username: session.user.username, display: session.user.display_name, color: session.user.color, role: session.user.role, ip: session.user.ip, token: session.user.token, status: 'online', xp: session.user.xp || 0, level: session.user.level || 1 };
+      const onlineSpec = { id: socket.id, username: session.user.username, display: session.user.display_name, color: session.user.color, role: session.user.role, ip: session.user.ip, token: session.user.token, status: 'online', xp: session.user.xp || 0, level: session.user.level || 1, dnd: session.user.dnd || 0 };
       onlineUsers.set(socket.id, onlineSpec);
       broadcastUsers();
       socket.emit('message', { type: 'system', text: `[>] SPECTATOR MODE OFF. You are visible again in #${prevRoom}`, time: now() });
@@ -1505,6 +1627,20 @@ function handleCommand(socket, session, text) {
 
     case 'beep':
       socket.emit('playsound', 'beep');
+      break;
+
+    // ─── Hacking Commands ────────────────────────────────────
+    case 'del':
+      if (session.user.role !== 'admin') { respond('[!] Admin only'); return; }
+      if (!args[0]) { respond('Usage: /del &lt;messageId&gt;'); return; }
+      const delId = parseInt(args[0]);
+      if (isNaN(delId)) { respond('[!] Invalid message ID'); return; }
+      const delResult = getDB().prepare('DELETE FROM messages WHERE id = ?').run(delId);
+      if (delResult.changes > 0) {
+        broadcast(`[!] Message #${delId} deleted by ${session.user.display_name}`);
+      } else {
+        respond('[!] Message not found');
+      }
       break;
 
     default:

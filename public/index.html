@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&family=Inter:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- ═══ DESKTOP ONLY OVERLAY ═══ -->
@@ -21,7 +21,11 @@
     </div>
   </div>
   <canvas id="matrix"></canvas>
+  <canvas id="particles"></canvas>
   <div id="glitch-layer"></div>
+  <div class="vhs-glitch"></div>
+  <div class="vhs-glitch"></div>
+  <div class="vhs-glitch"></div>
   <div class="crt-overlay"></div>
 
   <!-- ═══ BOOT SCREEN ═══ -->
@@ -59,17 +63,26 @@
     </div>
   </div>
 
-  <!-- ═══ MAINTENANCE OVERLAY ═══ -->
+  <!-- ═══ MAINTENANCE OVERLAY (Hacker Movie Style) ═══ -->
   <div id="maintenance-overlay" class="emergency-overlay" style="display:none">
-    <div class="emergency-box">
-      <div class="emergency-icon">🔧</div>
-      <div class="emergency-title">MAINTENANCE MODE</div>
-      <div class="emergency-sub" id="maintenance-msg">Server is under maintenance. Please try again later.</div>
-      <div class="emergency-output" id="maintenance-output">
-        <div class="line">> System maintenance in progress...</div>
-        <div class="line">> Please wait while we upgrade our systems.</div>
+    <div class="emergency-box maint-box">
+      <div class="maint-scanline"></div>
+      <div class="maint-glitch-text" id="maint-glitch">⚠ SYSTEM COMPROMISED ⚠</div>
+      <div class="emergency-icon maint-icon">⚠</div>
+      <div class="emergency-title maint-title">> MAINTENANCE MODE</div>
+      <div class="emergency-sub maint-sub" id="maintenance-msg">[!] Server is under maintenance. Please try again later.</div>
+      <div class="emergency-output maint-output" id="maintenance-output">
+        <div class="line maint-line">> Initializing emergency protocol...</div>
+        <div class="line maint-line">> Encrypting all traffic (AES-256)...</div>
+        <div class="line maint-line">> Firewall: 12 rules updated</div>
+        <div class="line maint-line">> System integrity check: RUNNING</div>
       </div>
-      <button id="maintenance-refresh" class="emergency-btn">> RETRY CONNECTION</button>
+      <div class="maint-progress-wrap">
+        <div class="maint-progress-bar" id="maint-progress-bar"></div>
+      </div>
+      <div class="maint-status" id="maint-status">Scanning network...</div>
+      <button id="maintenance-refresh" class="emergency-btn maint-btn">> RETRY CONNECTION</button>
+      <div class="maint-footer">[ AtlasRoot v4.0 - Secure Communication System ]</div>
     </div>
   </div>
 
@@ -87,6 +100,7 @@
 ║       TWO-STEP AUTH v4.0            ║
 ╚═══════════════════════════════════════╝
       </div>
+      <div id="auth-conn-status" class="auth-conn-status" style="text-align:center;font-size:11px;color:var(--fg-darker);margin-bottom:8px">CONNECTING...</div>
       <div class="auth-tabs">
         <button class="auth-tab active" data-tab="login">[ LOGIN ]</button>
         <button class="auth-tab" data-tab="register">[ REGISTER ]</button>
@@ -181,6 +195,7 @@
   <!-- ═══ CHAT ═══ -->
   <div id="chat-screen" class="screen">
     <div class="chat-container">
+      <div class="scan-line"></div>
       <!-- Header -->
       <div class="chat-header">
         <div class="chat-header-left">
@@ -196,18 +211,19 @@
         <div class="chat-header-right">
           <div class="hdr-btn-group">
             <button id="anon-btn" class="hdr-btn" title="Anonymous mode">👤</button>
-            <button id="users-toggle-btn" class="hdr-btn" title="Toggle users">👥</button>
             <button id="notif-btn" class="hdr-btn" title="Notifications">🔔<span id="notif-badge" class="notif-badge-hdr">0</span></button>
             <button id="pc-btn" class="hdr-btn" title="Private Chat">🔒</button>
             <button id="sound-toggle" class="hdr-btn" title="Toggle sound">♪</button>
           </div>
           <div class="hdr-divider"></div>
           <div class="theme-switcher">
-            <button class="theme-btn active" data-theme="green">G</button>
-            <button class="theme-btn" data-theme="amber">A</button>
-            <button class="theme-btn" data-theme="blue">B</button>
-            <button class="theme-btn" data-theme="red">R</button>
-            <button class="theme-btn" data-theme="pink">P</button>
+            <button class="theme-btn active" data-theme="green" title="Green (Matrix)">🟢</button>
+            <button class="theme-btn" data-theme="amber" title="Amber (Fallout)">🟠</button>
+            <button class="theme-btn" data-theme="blue" title="Blue">🔵</button>
+            <button class="theme-btn" data-theme="red" title="Red">🔴</button>
+            <button class="theme-btn" data-theme="pink" title="Pink">🩷</button>
+            <button class="theme-btn" data-theme="cyberpunk" title="Cyberpunk">💠</button>
+            <button class="theme-btn" data-theme="purple" title="Purple">🟣</button>
           </div>
         </div>
       </div>
@@ -217,18 +233,16 @@
         <div class="chat-messages" id="chat-messages">
           <div class="welcome-msg">
             <pre>
-  ╔══════════════════════════════════╗
-  ║  ██╗  ██╗ █████╗  ██████╗██╗  ██╗
-  ║  ██║  ██║██╔══██╗██╔════╝██║ ██╔╝
-  ║  ███████║███████║██║     █████╔╝
-  ║  ██╔══██║██╔══██║██║     ██╔═██╗
-  ║  ██║  ██║██║  ██║╚██████╗██║  ██╗
-  ║  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-  ║                                      ║
-  ║  Type /help for commands           ║
-  ║  Click username to profile        ║
-  ║  Click time to reply              ║
-  ╚══════════════════════════════════════╝
+╔══════════════════════════╗
+║   ATLASROOT v4.0         ║
+║   Secure Chat Network    ║
+║                          ║
+║   /help  - show commands ║
+║   /nick  - change name   ║
+╠══════════════════════════╣
+║   Click username → view  ║
+║   Click msg time → reply ║
+╚══════════════════════════╝
             </pre>
           </div>
         </div>
@@ -271,19 +285,13 @@
           <button class="emoji-strip-btn" data-emoji="❌">❌</button>
         </div>
         <div class="chat-input-row">
-          <span class="input-prompt">></span>
-          <div class="status-dropdown" id="input-status-dropdown">
-            <button class="status-dropdown-btn" id="input-status-btn" title="Change status">🟢</button>
-            <div class="status-dropdown-menu" id="input-status-menu">
-              <div class="status-dropdown-item active" data-status="online">🟢 Online</div>
-              <div class="status-dropdown-item" data-status="away">🟡 Away</div>
-              <div class="status-dropdown-item" data-status="busy">🔴 Busy</div>
-              <div class="status-dropdown-item" data-status="invisible">⚫ Invisible</div>
-            </div>
+          <span class="input-prompt">&gt;</span>
+          <input type="text" id="message-input" placeholder="type a command or message..." autofocus>
+          <div class="input-actions">
+            <button id="file-btn" class="input-btn" title="Upload file">📁</button>
+            <button id="msg-search-btn" class="input-btn" title="Search (Ctrl+F)">🔍</button>
+            <button id="send-btn" class="input-btn exec-btn">▶ SEND</button>
           </div>
-          <input type="text" id="message-input" placeholder="type command or message..." autofocus>
-          <button id="file-btn" class="input-btn" title="Upload file">📎</button>
-          <button id="send-btn" class="input-btn exec-btn">EXECUTE</button>
           <input type="file" id="file-input" style="display:none">
         </div>
       </div>
@@ -291,11 +299,9 @@
       <!-- Footer -->
       <div class="chat-footer">
         <div class="footer-left">
-          <span class="footer-badge">AES-256</span>
+          <span class="footer-badge">🔒 AES-256</span>
           <span class="footer-divider"></span>
-          <span class="footer-stat" id="cpu-meter"><span class="stat-label">CPU</span><span class="stat-bar"><span class="stat-fill" id="cpu-fill"></span></span><span class="stat-val" id="cpu-val">0%</span></span>
-          <span class="footer-divider"></span>
-          <span class="footer-stat" id="ram-meter"><span class="stat-label">RAM</span><span class="stat-bar"><span class="stat-fill" id="ram-fill"></span></span><span class="stat-val" id="ram-val">0MB</span></span>
+          <span class="footer-stat"><span class="stat-label">👥</span><span class="stat-val" id="user-count-footer">0 online</span></span>
           <span class="footer-divider"></span>
           <div class="xp-bar-wrap" id="xp-bar-wrap" style="display:none">
             <span class="xp-bar-label" id="xp-bar-label">LVL 1</span>
@@ -418,6 +424,8 @@
           <button class="theme-btn" data-theme="amber">🟠 AMBER</button>
           <button class="theme-btn" data-theme="green">🟢 GREEN</button>
           <button class="theme-btn" data-theme="red">🔴 RED</button>
+          <button class="theme-btn" data-theme="cyberpunk">🔵 CYBER</button>
+          <button class="theme-btn" data-theme="purple">🟣 PURPLE</button>
         </div>
         <div class="modal-row"><span class="modal-label">🔑 SESSION</span><button id="settings-logout-btn" class="modal-action">LOG OUT</button></div>
       </div>
