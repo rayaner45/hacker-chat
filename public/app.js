@@ -2285,26 +2285,28 @@ function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Hook whisper into private chat
+// Hook whisper into private chat (do NOT show in main chat)
 var _origAddMessage = addMessage;
 addMessage = function (data) {
-  _origAddMessage(data);
-  if (data.type === 'whisper') {
-    addPrivateMessage(data.from, data.text, data.time||new Date().toLocaleTimeString(), true);
-    var overlay = document.getElementById('private-chat');
-    if (overlay && overlay.style.display === 'none') {
-      var pcBtn = document.getElementById('pc-btn');
-      if (pcBtn) { pcBtn.style.color = '#f0f'; setTimeout(function () { pcBtn.style.color = ''; }, 2000); }
+  if (data.type === 'whisper' || data.type === 'whisper-sent') {
+    if (data.type === 'whisper') {
+      addPrivateMessage(data.from, data.text, data.time||new Date().toLocaleTimeString(), true);
+      var overlay = document.getElementById('private-chat');
+      if (overlay && overlay.style.display === 'none') {
+        var pcBtn = document.getElementById('pc-btn');
+        if (pcBtn) { pcBtn.style.color = '#f0f'; setTimeout(function () { pcBtn.style.color = ''; }, 2000); }
+      }
+      if (document.hidden) {
+        var origTitle = document.title;
+        document.title = '🔔 Whisper from ' + data.from;
+        setTimeout(function () { document.title = origTitle; }, 3000);
+      }
+    } else {
+      addPrivateMessage(data.to, data.text, data.time||new Date().toLocaleTimeString(), false);
     }
-    // Tab notification flash on whisper
-    if (document.hidden) {
-      var origTitle = document.title;
-      document.title = '🔔 Whisper from ' + data.from;
-      setTimeout(function () { document.title = origTitle; }, 3000);
-    }
-  } else if (data.type === 'whisper-sent') {
-    addPrivateMessage(data.to, data.text, data.time||new Date().toLocaleTimeString(), false);
+    return;
   }
+  _origAddMessage(data);
 };
 
 // ─── Focus Mode ─────────────────────────────────────────────
