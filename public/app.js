@@ -1936,6 +1936,21 @@ if (maintStatus) {
   });
 }
 
+// ─── Role Changed Handler ────────────────────────────────
+App.socket.on('role:changed', function (data) {
+  if (App.user) {
+    App.user.role = data.role;
+    var myRole = document.getElementById('my-role');
+    if (myRole) myRole.textContent = '[' + data.role.toUpperCase() + ']';
+    var adminBtn = document.getElementById('admin-panel-btn');
+    if (adminBtn) adminBtn.style.display = data.role === 'admin' ? 'inline' : 'none';
+    if (data.role === 'admin') {
+      var maintOverlay = document.getElementById('maintenance-overlay');
+      if (maintOverlay) maintOverlay.style.display = 'none';
+    }
+  }
+});
+
 // ─── Admin Panel ────────────────────────────────────────────
 var adminPanel = document.getElementById('admin-panel');
 var adminPanelClose = document.getElementById('admin-panel-close');

@@ -742,14 +742,15 @@ io.on('connection', (socket) => {
     socket.emit('message', {type:'system',text:'[!] User unbanned',time:now()});
   });
 
-  socket.on('admin:setrole', ({ userId, role }) => {
+   socket.on('admin:setrole', ({ userId, role }) => {
     if (!session.authed || session.user.role !== 'admin') return;
     if (!['user','mod','admin'].includes(role)) { socket.emit('message', {type:'system',text:'[!] Invalid role',time:now()}); return; }
     getDB().prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId);
     const u = getDB().prepare('SELECT username FROM users WHERE id = ?').get(userId);
     socket.emit('message', {type:'system',text:`[!] ${u.username} role set to ${role}`,time:now()});
     const ts = findOnlineSocket(u.username);
-    if (ts && ts.data) ts.data.role = role;
+    if (ts && ts.data) { ts.data.role = role; ts.emit('role:changed', { role }); }
+    if (ts) ts.emit('message', { type:'whisper', text:`🔐 You have been promoted to ${role.toUpperCase()} by an administrator.`, time:now(), whisper: true });
     broadcastUsers();
   });
 
@@ -1422,6 +1423,11 @@ function handleCommand(socket, session, text) {
         if (u.username.toLowerCase() === args[0].toLowerCase()) { u.role = args[1]; break; }
       }
       broadcastUsers();
+      const targetSetSock = findOnlineSocket(args[0]);
+      if (targetSetSock) {
+        targetSetSock.emit('role:changed', { role: args[1] });
+        targetSetSock.emit('message', { type:'whisper', text:`🔐 You have been promoted to ${args[1].toUpperCase()} by an administrator.`, time:now(), whisper: true });
+      }
       respond(`[+] ${args[0]} role set to ${args[1]}`);
       break;
 
