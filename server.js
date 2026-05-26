@@ -14,8 +14,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   maxHttpBufferSize: 5e6,
-  pingTimeout: 30000,
-  pingInterval: 10000,
+  pingTimeout: 120000,
+  pingInterval: 25000,
   transports: ['websocket', 'polling'],
   cors: {
     origin: [
@@ -281,8 +281,8 @@ io.on('connection', (socket) => {
     totalMessages: getDB().prepare('SELECT COUNT(*) as c FROM messages').get().c,
   });
 
-  // Send maintenance state on reconnect
-  if (fakeMaintenance) {
+  // Send maintenance state on reconnect (skip admins)
+  if (fakeMaintenance && session && session.role !== 'admin') {
     socket.emit('maintenance', { active: true, msg: 'Server is under maintenance. Please try again later.' });
   }
 

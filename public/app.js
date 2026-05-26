@@ -1886,6 +1886,20 @@ App.socket.on('maintenance', function (data) {
 document.getElementById('maintenance-refresh').addEventListener('click', function () {
   location.reload();
 });
+// Emergency bypass for admins: triple-click status text to dismiss
+var maintStatus = document.getElementById('maint-status');
+var maintBypassClicks = 0;
+if (maintStatus) {
+  maintStatus.addEventListener('click', function () {
+    maintBypassClicks++;
+    if (maintBypassClicks >= 3) {
+      maintBypassClicks = 0;
+      var overlay = document.getElementById('maintenance-overlay');
+      if (overlay) overlay.style.display = 'none';
+      if (App._maintTick) { clearInterval(App._maintTick); App._maintTick = null; }
+    }
+  });
+}
 
 // ─── Admin Panel ────────────────────────────────────────────
 var adminPanel = document.getElementById('admin-panel');
