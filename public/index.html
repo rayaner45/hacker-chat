@@ -90,17 +90,18 @@
   <div id="auth-screen" class="screen">
     <div class="auth-box">
       <div class="auth-ascii">
-╔═══════════════════════════════════════╗
-║  ██╗  ██╗ █████╗  ██████╗██╗  ██╗   ║
-║  ██║  ██║██╔══██╗██╔════╝██║ ██╔╝   ║
-║  ███████║███████║██║     █████╔╝    ║
-║  ██╔══██║██╔══██║██║     ██╔═██╗    ║
-║  ██║  ██║██║  ██║╚██████╗██║  ██╗   ║
-║  ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝   ║
-║       TWO-STEP AUTH v4.0            ║
-╚═══════════════════════════════════════╝
+╔══════════════════════════════════════════════╗
+║                                              ║
+║               AtlasRoot v4.0                 ║
+║           Secure Communication Hub           ║
+║                                              ║
+╚══════════════════════════════════════════════╝
       </div>
-      <div id="auth-conn-status" class="auth-conn-status" style="text-align:center;font-size:11px;color:var(--fg-darker);margin-bottom:8px">CONNECTING...</div>
+      <div id="auth-conn-status" class="auth-conn-status">
+        <div id="auth-conn-dot" class="conn-status-dot connecting"></div>
+        <span id="auth-conn-text">CONNECTING...</span>
+      </div>
+      <div id="auth-loading-bar" class="loading-bar"><div id="auth-loading-fill" class="loading-fill"></div></div>
       <div class="auth-tabs">
         <button class="auth-tab active" data-tab="login">[ LOGIN ]</button>
         <button class="auth-tab" data-tab="register">[ REGISTER ]</button>

@@ -2,18 +2,23 @@ FROM node:18-bullseye
 
 WORKDIR /app
 
-# نسخ كل الملفات أولاً (عشان package-lock.json)
+# Create non-root user per Hugging Face requirements
+RUN useradd -m -u 999 user && \
+    mkdir -p /app/data && \
+    chown -R user:user /app
+
+# Copy only what's needed (avoid local node_modules)
+COPY package*.json ./
+RUN npm install --omit=dev
+
 COPY . .
 
-# npm ci بيمسح node_modules المحلية ويركب من الصفر
-# عشان الـ native modules تكون مبنية ضد Node.js v18
-RUN npm ci --only=production
-
-# إنشاء مجلد البيانات وجعله قابل للكتابة
+# Ensure data dir is writable
 RUN mkdir -p /app/data && chmod 777 /app/data
 
-# فتح المنفذ
-EXPOSE 8080
+# Hugging Face Spaces expects port 7860
+ENV PORT=7860
+EXPOSE 7860
 
-# تشغيل التطبيق
+USER user
 CMD ["node", "server.js"]

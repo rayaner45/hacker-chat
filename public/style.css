@@ -3038,6 +3038,30 @@ body {
   94% { opacity: 0.2; }
 }
 
+/* Loading bar for connection status */
+.loading-bar {
+  width: 100%; height: 2px;
+  background: rgba(0,255,0,0.05);
+  margin: 4px 0 10px;
+  overflow: hidden;
+  border-radius: 1px;
+}
+.loading-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, transparent, var(--fg), transparent);
+  animation: loadFill 2s ease-in-out infinite;
+}
+@keyframes loadFill {
+  0% { width: 0%; margin-left: 0; }
+  50% { width: 60%; }
+  100% { width: 0%; margin-left: 100%; }
+}
+.auth-conn-status {
+  text-align: center; font-size: 10px;
+  color: var(--fg-darker); margin-bottom: 2px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
 /* Loading dots animation for connecting status */
 @keyframes loadDots {
   0% { content: '.'; }

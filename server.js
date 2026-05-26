@@ -28,6 +28,10 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -420,9 +424,25 @@ io.on('connection', (socket) => {
     }
     // One account per device for guests too
     if (deviceId) {
-      const existing = getDB().prepare('SELECT username FROM users WHERE device_id = ?').get(deviceId);
+      const existing = getDB().prepare('SELECT * FROM users WHERE device_id = ?').get(deviceId);
       if (existing) {
-        socket.emit('auth:error', 'لا يمكنك إنشاء أكثر من حساب واحد من هذا المتصفح');
+        // Log in as existing user instead of creating duplicate
+        getDB().prepare('UPDATE users SET last_login = ? WHERE id = ?').run(Math.floor(Date.now()/1000), existing.id);
+        session.user = existing;
+        session.authed = true;
+        enforceSingleSession(existing.username);
+        const online = { id: socket.id, username: existing.username, display: existing.display_name, color: existing.color, role: existing.role, ip: existing.ip, token: existing.token, status: 'online', xp: existing.xp || 0, level: existing.level || 1 };
+        onlineUsers.set(socket.id, online);
+        socket.join('lobby');
+        session.room = 'lobby';
+        socket.emit('auth:success', { user: online, token: existing.token, room: 'lobby' });
+        socket.emit('room:joined', { room: 'lobby', topic: 'General discussion' });
+        const welcomeMsg = WELCOME_MSGS[Math.floor(Math.random() * WELCOME_MSGS.length)].replace('{user}', existing.display_name);
+        socket.emit('message', { type: 'system', text: welcomeMsg, time: now() });
+        io.to('lobby').emit('message', { type: 'system', text: `${existing.display_name} joined the channel`, time: now() });
+        broadcastUsers();
+        emitRoomUpdate();
+        sendHistory(socket, 'lobby');
         return;
       }
     }

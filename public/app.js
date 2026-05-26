@@ -1703,18 +1703,52 @@ if (savedTheme) {
 
 // ─── Connection management ─────────────────────────────────
 App.connError = null;
+var bootMessages = [
+  '> Initializing kernel...',
+  '> Loading network modules...',
+  '> Establishing secure tunnel...',
+  '> Handshake in progress...',
+  '> Encrypting channel (AES-256)...',
+  '> Authenticating session...',
+];
 function updateAuthConnStatus() {
   var el = document.getElementById('auth-conn-status');
+  var bar = document.getElementById('auth-loading-bar');
+  var dot = document.getElementById('auth-conn-dot');
+  var text = document.getElementById('auth-conn-text');
   if (!el) return;
   if (App.socket && App.socket.connected) {
-    el.textContent = '● CONNECTED';
+    if (text) text.textContent = '● CONNECTED';
     el.style.color = '#0f0';
+    if (dot) { dot.className = 'conn-status-dot connected'; }
+    if (bar) bar.style.opacity = '0';
+    var term = document.getElementById('auth-terminal');
+    if (term) {
+      term.innerHTML = '<div class="term-line system">> AUTHENTICATION REQUIRED</div><div class="term-line system">> STEP 1: ENTER USER ID</div>';
+    }
   } else if (App.socket && App.socket.connecting) {
-    el.textContent = '○ CONNECTING...';
+    if (text) text.textContent = '○ CONNECTING...';
     el.style.color = '#ff0';
+    if (dot) { dot.className = 'conn-status-dot connecting'; }
+    if (bar) bar.style.opacity = '1';
+    var term = document.getElementById('auth-terminal');
+    if (term && term.children.length < 8) {
+      var idx = Math.floor(Date.now() / 1200) % bootMessages.length;
+      var msg = bootMessages[idx];
+      var existing = term.querySelector('.term-line:last-child');
+      if (!existing || existing.textContent !== msg) {
+        var div = document.createElement('div');
+        div.className = 'term-line system';
+        div.textContent = msg;
+        term.appendChild(div);
+        term.scrollTop = term.scrollHeight;
+      }
+    }
   } else {
-    el.textContent = '✕ ' + (App.connError || 'DISCONNECTED');
+    if (text) text.textContent = '✕ ' + (App.connError || 'DISCONNECTED');
     el.style.color = '#f44';
+    if (dot) { dot.className = 'conn-status-dot disconnected'; }
+    if (bar) bar.style.opacity = '0';
   }
 }
 App.socket.on('connect', function () {
