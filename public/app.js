@@ -423,11 +423,11 @@ var App = {
 App.socket = io({
   transports: ['websocket', 'polling'],
   upgrade: false,
-  timeout: 30000,
+  timeout: 60000,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
+  reconnectionDelayMax: 10000,
 });
 
 // ─── DOM refs ──────────────────────────────────────────────
@@ -2120,8 +2120,26 @@ function initPrivateChat() {
   var backBtn = document.getElementById('private-chat-back');
   var typingEl = document.getElementById('private-chat-typing');
 
-  function open() { overlay.style.display = 'flex'; renderConversations(); }
-  function close() { overlay.style.display = 'none'; App.privateChat.activeUser = null; }
+  function open() {
+    overlay.style.display = 'flex';
+    // Reset mobile view: show sidebar, hide main panel
+    var sidebarEl = document.querySelector('.private-chat-sidebar');
+    var mainEl = document.querySelector('.private-chat-main');
+    if (sidebarEl) sidebarEl.style.display = 'flex';
+    if (mainEl) mainEl.classList.remove('show');
+    renderConversations();
+  }
+  function close() {
+    overlay.style.display = 'none';
+    App.privateChat.activeUser = null;
+    // Reset mobile view for next open
+    var sidebarEl = document.querySelector('.private-chat-sidebar');
+    var mainEl = document.querySelector('.private-chat-main');
+    if (sidebarEl) sidebarEl.style.display = 'flex';
+    if (mainEl) mainEl.classList.remove('show');
+    // Focus main chat input so user can type immediately
+    messageInput.focus();
+  }
   function closeIfMobile() { if (window.innerWidth <= 600) { close(); } }
 
   document.getElementById('private-chat-close').addEventListener('click', close);
