@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: atlas-root
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: DATABASE_PATH
+        value: ./data/hackerchat.db
+      - key: NODE_VERSION
+        value: 18.18.0
