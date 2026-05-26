@@ -465,7 +465,7 @@ io.on('connection', (socket) => {
     onlineUsers.set(socket.id, online);
     socket.join('lobby');
     session.room = 'lobby';
-    socket.emit('auth:success', { user: online, token: u.token, room: 'lobby' });
+    socket.emit('auth:success', { user: online, token: u.token, room: 'lobby', password: guestPass });
     socket.emit('room:joined', { room: 'lobby', topic: 'General discussion' });
     const welcomeMsg = WELCOME_MSGS[Math.floor(Math.random() * WELCOME_MSGS.length)].replace('{user}', u.display_name);
     socket.emit('message', { type: 'system', text: welcomeMsg, time: now() });

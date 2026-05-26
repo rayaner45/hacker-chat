@@ -112,14 +112,23 @@
           bootScreen.style.display = 'none';
           var urlParams = new URLSearchParams(window.location.search);
           var saved = localStorage.getItem('hackerchat-auth');
+          var guestSaved = sessionStorage.getItem('hackerchat-guest');
           if (urlParams.has('fresh') || urlParams.has('logout')) {
             localStorage.removeItem('hackerchat-auth');
+            sessionStorage.removeItem('hackerchat-guest');
             saved = null;
+            guestSaved = null;
           }
-          var autoUser = urlParams.get('user') || (saved ? saved.split(':')[0] : null);
-          var autoPass = urlParams.get('pass') || (saved ? saved.split(':')[1] : null);
-          if (autoUser && autoPass) {
-            App.autoLogin = { user: autoUser, pass: autoPass };
+          if (guestSaved) {
+            var g = guestSaved.split(':');
+            App.autoLogin = { user: g[0], pass: g[1] };
+            sessionStorage.setItem('hackerchat-guest', guestSaved);
+          } else {
+            var autoUser = urlParams.get('user') || (saved ? saved.split(':')[0] : null);
+            var autoPass = urlParams.get('pass') || (saved ? saved.split(':')[1] : null);
+            if (autoUser && autoPass) {
+              App.autoLogin = { user: autoUser, pass: autoPass };
+            }
           }
           if (App.autoLogin) {
             App.skipAuth = true;
@@ -524,8 +533,15 @@ document.querySelector('.auth-tab[data-tab="register"]').addEventListener('click
 $('guest-btn').addEventListener('click', function () {
   if (!App.socket || !App.socket.connected) { ensureConnection(function(){}); return; }
   authTerminal.innerHTML = '';
-  addTermLine('CREATING GUEST ACCOUNT...', 'processing');
-  App.socket.emit('auth:guest', { deviceId: getDeviceId() });
+  var guestSaved = sessionStorage.getItem('hackerchat-guest');
+  if (guestSaved) {
+    var g = guestSaved.split(':');
+    addTermLine('RESTORING GUEST SESSION...', 'processing');
+    App.socket.emit('auth:login', { username: g[0], password: g[1], deviceId: getDeviceId() });
+  } else {
+    addTermLine('CREATING GUEST ACCOUNT...', 'processing');
+    App.socket.emit('auth:guest', { deviceId: getDeviceId() });
+  }
 });
 
 // ─── Forget Algorithm (Account Recovery) ──────────────────────
@@ -589,6 +605,9 @@ App.socket.on('auth:success', function (data) {
   if (App.autoLogin) {
     localStorage.setItem('hackerchat-auth', App.autoLogin.user + ':' + App.autoLogin.pass);
   }
+  if (data.password && data.user.username && data.user.username.indexOf('guest_') === 0) {
+    sessionStorage.setItem('hackerchat-guest', data.user.username + ':' + data.password);
+  }
   if (App.skipAuth) {
     authScreen.classList.remove('active');
     App.skipAuth = false;
@@ -625,6 +644,7 @@ App.socket.on('auth:success', function (data) {
 
 $('logout-btn').addEventListener('click', function () {
   localStorage.removeItem('hackerchat-auth');
+  sessionStorage.removeItem('hackerchat-guest');
   App.socket.disconnect();
   location.reload();
 });
@@ -1501,6 +1521,7 @@ App.socket.on('admin:lockdown', function (state) {
   // EXIT button
   document.getElementById('sidebar-exit').addEventListener('click', function () {
     localStorage.removeItem('hackerchat-auth');
+    sessionStorage.removeItem('hackerchat-guest');
     App.socket.disconnect();
     location.reload();
   });
@@ -1531,6 +1552,7 @@ App.socket.on('admin:lockdown', function (state) {
   document.getElementById('settings-logout-btn').addEventListener('click', function () {
     settingsModal.classList.remove('active');
     localStorage.removeItem('hackerchat-auth');
+    sessionStorage.removeItem('hackerchat-guest');
     App.socket.disconnect();
     location.reload();
   });
