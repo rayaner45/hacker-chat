@@ -2165,7 +2165,6 @@ function initPrivateChat() {
     if (!text || !App.privateChat.activeUser) return;
     var user = App.privateChat.activeUser;
     App.socket.emit('whisper', { target: user, text: text });
-    addPrivateMessage(user, text, new Date().toLocaleTimeString(), false);
     input.value = '';
     input.focus();
   }
