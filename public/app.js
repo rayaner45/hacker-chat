@@ -702,14 +702,22 @@ if (roomsSearch) {
 $('create-room-btn').addEventListener('click', function () {
   var name = $('new-room-name').value.trim();
   var topic = $('new-room-topic').value.trim();
+  var password = $('new-room-password').value.trim();
   if (!name) return;
-  App.socket.emit('room:create', { name: name, topic: topic });
+  App.socket.emit('room:create', { name: name, topic: topic, password: password || undefined });
   $('new-room-name').value = '';
   $('new-room-topic').value = '';
+  $('new-room-password').value = '';
 });
 
 $('new-room-name').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') $('create-room-btn').click();
+});
+
+// Password-protected room handler
+App.socket.on('room:password_required', function (data) {
+  var pwd = prompt('🔐 Room "' + data.name + '" requires password:');
+  if (pwd) App.socket.emit('room:join', { name: data.name, password: pwd });
 });
 
 // ─── Chat ──────────────────────────────────────────────────
@@ -917,8 +925,22 @@ App.socket.on('users', function (users) {
 
 App.socket.on('typing', function (user) {
   typingIndicator.innerHTML = user + ' <span class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span>';
+  // Animate avatar in user list
+  var items = document.querySelectorAll('.user-item');
+  for (var i = 0; i < items.length; i++) {
+    var name = items[i].querySelector('.u-name');
+    if (name && name.textContent.indexOf(user) !== -1) {
+      items[i].classList.add('user-typing');
+    }
+  }
 });
-App.socket.on('stoptyping', function () { typingIndicator.innerHTML = ''; });
+App.socket.on('stoptyping', function () {
+  typingIndicator.innerHTML = '';
+  var items = document.querySelectorAll('.user-item.user-typing');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.remove('user-typing');
+  }
+});
 
 // ─── Live Typing Display ────────────────────────────────────
 var liveTypingEl = document.createElement('div');
@@ -1627,9 +1649,22 @@ App.socket.on('room:topic', function (data) {
 var COMMANDS = ['help','nick','color','whisper','ping','scan','hack','clear','netstat','encrypt','search','ban','unban','setrole','mute','kick','announce','status','title','whois','time','uptime','motd','join','leave','create','users','room','firewall','blocked','banip','unbanip','clearroom','lockdown','export','sys','ai','grep','sound','reply','profile','rank','unlock','fake_maintenance','export_security_logs','del'];
 
 // ─── Send ──────────────────────────────────────────────────
+var SUSPICIOUS_DOMAINS = ['bit.ly','tinyurl','shorturl','short-link','t.co','rb.gy','shorturl.at','cutt.ly','ow.ly','is.gd','buff.ly','tiny.cc','tr.im','shorte.st'];
+function hasSuspiciousLink(text) {
+  var match = text.match(/https?:\/\/[^\s]+/ig);
+  if (!match) return false;
+  for (var i = 0; i < match.length; i++) {
+    var url = match[i].toLowerCase();
+    for (var d = 0; d < SUSPICIOUS_DOMAINS.length; d++) {
+      if (url.indexOf(SUSPICIOUS_DOMAINS[d]) !== -1) return true;
+    }
+  }
+  return false;
+}
 function send() {
   var text = messageInput.value.trim();
   if (!text) return;
+  if (hasSuspiciousLink(text) && !confirm('⚠ Suspicious link detected: ' + text.match(/https?:\/\/[^\s]+/i)[0] + '\n\nSend anyway?')) return;
   if (!App.socket || !App.socket.connected) {
     addMessage({ type: 'system', text: '[!] Connection lost. Reconnecting...', time: '' });
     App.socket.connect();

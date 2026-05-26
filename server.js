@@ -125,6 +125,9 @@ const WELCOME_MSGS = [
 let globalReplyTimer = 0; // seconds
 const replyTimerMap = new Map();
 
+// ─── Anti-spam last message tracker ───────────────────────────
+const lastUserMsg = new Map(); // socket.id -> { text, count }
+
 // ─── DND Users ────────────────────────────────────────────────
 const dndUsers = new Set(); // username lowercase
 
@@ -584,6 +587,20 @@ io.on('connection', (socket) => {
     if (!text.trim()) return;
     if (text.startsWith('/')) { handleCommand(socket, session, text); return; }
     if (spectatorSessions.has(socket.id)) { socket.emit('message', { type: 'system', text: '[!] Spectators cannot send messages', time: now() }); return; }
+    // Suspicious link filter
+    const linkMatch = text.match(/https?:\/\/[^\s]+/gi);
+    if (linkMatch) {
+      const SUSPICIOUS = ['bit.ly','tinyurl','shorturl','short-link','t.co','rb.gy','shorturl.at','cutt.ly','ow.ly','is.gd','buff.ly','tiny.cc','tr.im','shorte.st'];
+      for (let i = 0; i < linkMatch.length; i++) {
+        const u = linkMatch[i].toLowerCase();
+        for (let d = 0; d < SUSPICIOUS.length; d++) {
+          if (u.includes(SUSPICIOUS[d])) {
+            socket.emit('message', { type: 'system', text: `[!] Blocked: suspicious link (${SUSPICIOUS[d]})`, time: now() });
+            return;
+          }
+        }
+      }
+    }
     if (!checkRate(socket.id)) {
       socket.emit('message', { type: 'system', text: '[!] Slow down!', time: now() });
       return;
@@ -600,6 +617,20 @@ io.on('connection', (socket) => {
     }
     const safe = sanitize(text).slice(0, 1000);
     if (!safe) return;
+    // Anti-spam: duplicate message detection
+    const prev = lastUserMsg.get(socket.id);
+    if (prev && prev.text === safe) {
+      prev.count = (prev.count || 1) + 1;
+      if (prev.count >= 3) {
+        socket.emit('message', { type: 'system', text: '[!] Do not spam repeated messages', time: now() });
+        return;
+      }
+      if (prev.count === 2) {
+        socket.emit('message', { type: 'system', text: '[!] Warning: repeated message detected', time: now() });
+      }
+    } else {
+      lastUserMsg.set(socket.id, { text: safe, count: 1 });
+    }
     const msg = { type: 'user', user: session.user.display_name, color: session.user.color, text: safe, time: now(), id: socket.id };
     io.to(session.room).emit('message', msg);
     // Save to DB
@@ -625,12 +656,20 @@ io.on('connection', (socket) => {
   });
 
   // ─── Rooms ─────────────────────────────────────────────────
-  socket.on('room:join', (roomName) => {
+  socket.on('room:join', (data) => {
     if (!session.authed) return;
+    // Support both { name, password } and plain string
+    const roomName = typeof data === 'string' ? data : data.name;
+    const password = typeof data === 'string' ? null : data.password || null;
     const clean = sanitize(roomName);
     const db = getDB();
     const room = db.prepare('SELECT * FROM rooms WHERE name = ?').get(clean);
     if (!room) { socket.emit('message', { type: 'system', text: `[!] Room '${clean}' not found`, time: now() }); return; }
+    // Password check
+    if (room.password && (!password || password !== room.password)) {
+      socket.emit('room:password_required', { name: clean });
+      return;
+    }
     // Check ban
     const ban = db.prepare('SELECT * FROM bans WHERE username = ? AND room_id = ?').get(session.user.username, room.id);
     if (ban) { socket.emit('message', { type: 'system', text: '[!] You are banned from this room', time: now() }); return; }

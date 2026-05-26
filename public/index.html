@@ -187,6 +187,7 @@ AtlasRoot
         <div class="rooms-create">
           <input type="text" id="new-room-name" placeholder="ROOM NAME" maxlength="30">
           <input type="text" id="new-room-topic" placeholder="TOPIC (optional)" maxlength="100">
+          <input type="password" id="new-room-password" placeholder="PASSWORD (optional)" maxlength="50">
           <button id="create-room-btn">> CREATE ROOM</button>
         </div>
       </div>
@@ -206,6 +207,7 @@ AtlasRoot
         <div class="chat-header-left">
           <button id="back-btn" class="hdr-btn" title="Back to rooms">◀</button>
           <div class="hdr-divider"></div>
+          <span class="chat-header-prefix">&gt;</span>
           <span class="chat-header-room" id="current-room">LOBBY</span>
           <span class="chat-header-topic" id="current-topic"></span>
           <span class="focus-indicator" id="focus-indicator">[FOCUS]</span>
