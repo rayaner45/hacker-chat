@@ -1859,11 +1859,11 @@ App.socket.on('lobby:stats', function (stats) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'lobby-stats';
-    el.style.cssText = 'display:flex;gap:8px;font-size:6px;color:var(--fg-darker);letter-spacing:1px';
+    el.style.cssText = 'display:flex;gap:8px;font-size:6px;color:var(--fg-dark);letter-spacing:1px';
     document.querySelector('.chat-header-left').appendChild(el);
   }
   el.innerHTML =
-    '<span style="color:var(--fg-dim)">USERS: ' + (stats.onlineUsers || 0) + '</span>' +
+    '<span style="color:var(--fg)">USERS: ' + (stats.onlineUsers || 0) + '</span>' +
     '<span style="color:#f80">BLOCKED: ' + (stats.attemptsBlocked || 0) + '</span>' +
     '<span style="color:#f44">INTRUSION: ' + (stats.lastIntrusion || 'None').slice(0,30) + '</span>';
 });
